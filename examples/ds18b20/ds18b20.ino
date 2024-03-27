@@ -1,11 +1,3 @@
-/*
- *  This sketch sends data via HTTP GET requests to data.sparkfun.com service.
- *
- *  You need to get streamId and privateKey at data.sparkfun.com and paste them
- *  below. Or just customize this script to talk to other HTTP servers.
- *
- */
-
 #include <Arduino.h>
 #include <zbhci.h>
 #include <hci_display.h>
@@ -25,6 +17,12 @@
 #define REPORTING_PERIOD 10 //-- second(s)
 #define TICK_TIMEOUT 5 //-- second(s)
 
+#include "zigbee_logo.h"
+#include "zigbee_connected.h"
+#include "zigbee_disconnected.h"
+#include "zigbee_image.h"
+
+
 //-- GPIO where the DS18B20 is connected to
 const int oneWireBus = 4;     
 //-- Setup a oneWire instance to communicate with any OneWire devices
@@ -39,6 +37,13 @@ QueueHandle_t msg_queue;
 uint8_t numDevices = 0;
 #define TEMPERATURE_PRECISION 9
 
+GyverOLED<SSD1306_128x64> oled(SSD1306_OLED_ADDRESS);
+
+uint8_t ledState = 0;
+uint8_t netState = 0;
+uint8_t autoReport = 0;
+
+
 /**
  * Initialize a new OneButton instance for a button
  * connected to digital pin 4 and GND, which is active low
@@ -48,26 +53,63 @@ OneButton btn = OneButton(CONFIG_USR_BUTTON_PIN,     // Input pin for the button
                           true,  // Button is active LOW
                           true); // Enable internal pull-up resistor
 
+void drawSSD1306()
+{
+    numDevices = sensor.getDS18Count();
+
+    int16_t t = 0, X = 0, Y = 0;
+    char temp_data_str[100] = {0};
+
+    //-- header
+    oled.setCursorXY(0, 0);
+    oled.setScale(1);
+    oled.print("TLSR8258/ESP32C3");
+
+    //-- temperature sensors
+    for(int i = 0; i < numDevices; ++i) {
+        t = sensor.getTempCByIndex(i) * 100;
+        X = 0;
+        Y = 16 + i * 12;
+
+        oled.setCursorXY(X, Y); // курсор в (пиксель X, пиксель Y)
+        oled.setScale(1);
+        sprintf(temp_data_str, "ds18b20[%d]: %.2f", i, ((float)t)/100);
+        oled.print(temp_data_str);
+        oled.update();
+    }
+}
+
+void initSSD1306()
+{
+    oled.init(ESP32_SDA_PIN, ESP32_SCL_PIN);
+    // настройка скорости I2C
+    Wire.setClock(ESP32_I2C_CLOCK_SPEED);
+    
+    //-- logo at start
+    oled.clear();
+    oled.drawBitmap(0, 0, zigbee_logo, 128, 64);
+    oled.update();
+    delay(5000);
+ 
+    //-- icons
+    oled.clear();
+    //ssd1306_draw_bitmap(ssd1306_dev, 112, 48, zigbee_image, 16, 16);
+    //ssd1306_draw_bitmap(ssd1306_dev, 112, 0, zigbee_connected, 16, 16);
+    //ssd1306_draw_bitmap(ssd1306_dev, 112, 0, zigbee_disconnected, 16, 16);
+    //ssd1306_draw_bitmap(ssd1306_dev, 0, 16, zigbee, 128, 32);
+    oled.drawBitmap(112, 48, zigbee_image, 16, 16);
+    oled.drawBitmap(112, 0, zigbee_connected, 16, 16);
+}
+
+
 void useSSD1306(void *pvParameters)
 {
-  GyverOLED<SSD1306_128x64> oled(SSD1306_OLED_ADDRESS);
-  
-  oled.init(ESP32_SDA_PIN, ESP32_SCL_PIN);
-  
-  // битмап создан в ImageProcessor https://github.com/AlexGyver/imageProcessor
-  // с параметрами вывода vertical byte (OLED)
-  const uint8_t bitmap_32x32[] PROGMEM = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xC0, 0xC0, 0xE0, 0xF0, 0x70, 0x70, 0x30, 0x30, 0x30, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF0, 0x70, 0x30, 0x30, 0x20, 0x00, 0x00,
-    0x00, 0x30, 0x78, 0xFC, 0x7F, 0x3F, 0x0F, 0x0F, 0x1F, 0x3C, 0x78, 0xF0, 0xE0, 0xC0, 0x80, 0x80, 0x80, 0x40, 0xE0, 0xF0, 0xF8, 0xFC, 0xFF, 0x7F, 0x33, 0x13, 0x1E, 0x1C, 0x1C, 0x0E, 0x07, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF9, 0xF7, 0xEF, 0x5F, 0x3F, 0x7F, 0xFE, 0xFD, 0xFB, 0xF1, 0xE0, 0xC0, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x1E, 0x33, 0x33, 0x1F, 0x0F, 0x07, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x1F, 0x0E, 0x04, 0x00, 0x00, 0x00, 0x00,
-  };
-  // --------------------------
-  // настройка скорости I2C
-  Wire.setClock(ESP32_I2C_CLOCK_SPEED);
-
   while(1)
   {
+    drawSSD1306();
+    delay(5000);
+    
+    /*
     //-- !!!!!!!!!!!!!!!!!!!!!!!!! --
     //   oled.setScale(3); => do not use "3" for scaling, it causes the app's destroying!
     //-- !!!!!!!!!!!!!!!!!!!!!!!!! --
@@ -153,6 +195,7 @@ void useSSD1306(void *pvParameters)
     
     oled.update();
     delay(1000);
+    */
   }
 }
 
@@ -253,9 +296,6 @@ void getDs18b20Data()
 }
 
 
-uint8_t ledState = 0;
-uint8_t netState = 0;
-uint8_t autoReport = 0;
 
 void handleClick(void)
 {
@@ -294,13 +334,10 @@ void reportTask(void *pvParameters)
 void handleDoubleClick(void)
 {
     Serial.printf("handleDoubleClick: autoReport=%d\n", autoReport);
-    if (autoReport == 0)
-    {
+    if (autoReport == 0) {
         autoReport = 1;
         xTaskCreatePinnedToCore(reportTask, "report", 4096, NULL, 6, NULL, ARDUINO_RUNNING_CORE);
-    }
-    else
-    {
+    } else {
         autoReport = 0;
         Serial.println("Stop report task");
         delay(1000);
@@ -424,6 +461,7 @@ void setup()
     msg_queue = xQueueCreate(10, sizeof(ts_HciMsg));
     zbhci_Init(msg_queue);
 
+    initSSD1306();
     xTaskCreatePinnedToCore(zbhciTask, "zbhci", 4096, NULL, 5, NULL, ARDUINO_RUNNING_CORE);
     xTaskCreatePinnedToCore(useSSD1306, "useSSD1306", 4096, NULL, 10, NULL, ARDUINO_RUNNING_CORE);
 
