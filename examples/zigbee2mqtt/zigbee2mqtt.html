@@ -1,0 +1,63 @@
+<html><head><style>body {
+  font-family: Calibri;
+  font-size: 16px;
+  background-color: #eee;
+  color: black;
+  padding: 20px;
+}
+a {
+  color: #07c;
+  text-decoration: none;
+}
+a:hover {
+  color: #a00;
+}
+img {
+  max-width: 450px;
+}
+</style></head><body><h1 id="sensor-demo">Zigbee2MQTT &amp;  		Sensor Demo</h1>
+<p>A zigbee router device. esp32-c3 controls zigbee behavior via zbhci.</p>
+<h2 id="hardware-required">Hardware Required</h2>
+<ul>
+<li>One T-ZigBee board (device) and Other Zigbee coordinator (T-Zigbee board or USB Type Zigbee Coordinator)</li>
+<li>U2T</li>
+</ul>
+<h2 id="software-required">Software Required</h2>
+<ul>
+<li>Install <a href="https://zbhci.readthedocs.io/en/latest/user-guide/mosquitto.html">mosquitto</a></li>
+<li>Install <a href="https://zbhci.readthedocs.io/en/latest/user-guide/home-assistant.html">home assistant</a></li>
+<li>Install <a href="https://github.com/zigbee2mqtt/hassio-zigbee2mqtt">Zigbee2MQTT Addon</a> in case of USB Type Zigbee Coordinator.</li>
+</ul>
+<h2 id="zigbee2mqtt">1. Zigbee2MQTT</h2>
+<h3 id="case-1-t-zigbee-board-as-coordinator">T-Zigbee board as coordinator</h3>
+<p>Select one of the T-ZigBee as the zigbee gateway, and program the program <a href="../zigbee2mqtt">zigbee2mqtt</a>. And follow the <a href="https://zbhci.readthedocs.io/en/latest/user-guide/zigbee2mqtt.html">documentation</a> for related configuration.</p>
+<h2 id="sensor_demo">2. Sensor Demo</h2>
+<p>Select T-ZigBee as the node. Do the following.</p>
+<h3 id="make-hardware">Make hardware</h3>
+<p>Connect the T-Zigbee board with a dht11/dht22 sensor as follows (ex. Port 4 of the board to Out pin of dht sensor).</p>
+<p><img src="./docs/t-zigbee_sensor_hardware.jpg" alt=""></p>
+<h3 id="update-firmware">Update Firmware</h3>
+<p>Adjust the DIP switch:</p>
+<p><img src="../../docs/_static/upload_mode.png" alt=""></p>
+<p>Need to upgrade the firmware of TLSR8258 to <a href="../../firmware/hciDevice_ZR_8258_SDK_eb644f1_MD5_3e7c395bacca28475952808a79ff2ec1.bin">hciDevice_ZR_8258_SDK_eb644f1_MD5_3e7c395bacca28475952808a79ff2ec1.bin</a></p>
+<h3 id="upload-sketch">Upload Sketch</h3>
+<p>Adjust the DIP switch:</p>
+<p><img src="../../docs/_static/upload_mode_c3.png" alt=""></p>
+<p>Upload the <a href="./sensor_demo.ino">sensor_demo.ino</a> sketch after installing DHT sensor library from Arduino Library Manager or platformio Libraries menu.</p>
+<h2 id="pair">3. Pair</h2>
+<h3 id="case-1-t-zigbee-board-as-coordinator">T-Zigbee board as coordinator</h3>
+<ol>
+<li><p>Double-click the button on the upper side of the gateway to open the device join mode. Open successfully. The green led will be constant.</p>
+<p> <img src="../../docs/_static/user-guide/light-demo/permit_join.png" alt=""></p>
+</li>
+<li><p>Press and hold the button on the top of the node device for 3 seconds to start pairing. The green led will be constant, indicating that the pairing is complete.</p>
+<p> <img src="../../docs/_static/user-guide/light-demo/paired.png" alt=""></p>
+</li>
+</ol>
+<h2 id="home-assistant">4. Home Assistant</h2>
+<h3 id="case-1-t-zigbee-board-as-coordinator">T-Zigbee board as coordinator</h3>
+<p><img src="../../docs/_static/user-guide/light-demo/add-device_1.png" alt=""></p>
+<p><img src="../../docs/_static/user-guide/light-demo/add-device_2.png" alt=""></p>
+<p><img src="../../docs/_static/user-guide/light-demo/add-device_3.png" alt=""></p>
+<p><img src="./docs/add-sensor-device_1.png" alt=""></p>
+</body></html>

@@ -1,0 +1,75 @@
+<html><head><style>body {
+  background-color: #eee;
+  color: black;
+  padding: 20px;
+  font-family: Helvetica;
+  font-size: 16px;
+}
+a {
+  color: #07c;
+  text-decoration: none;
+}
+a:hover {
+  color: #a00;
+}
+img {
+  max-width: 550px;
+}</style>
+<title>DS18B20 Demo</title>
+</head><body><h1 id="ds18b20-demo">DS18B20 Demo</h1>
+<p>A zigbee router device. esp32-c3 controls zigbee behavior via zbhci.</p>
+<h2 id="hardware-required">Hardware Required</h2>
+<ul>
+<li>One T-ZigBee board (device) and Other Zigbee coordinator (T-Zigbee board or USB Type Zigbee Coordinator)</li>
+<li>U2T</li>
+</ul>
+<h2 id="software-required">Software Required</h2>
+<ul>
+<li>Install <a href="https://zbhci.readthedocs.io/en/latest/user-guide/mosquitto.html">mosquitto</a></li>
+<li>Install <a href="https://zbhci.readthedocs.io/en/latest/user-guide/home-assistant.html">home assistant</a></li>
+<li>Install <a href="https://github.com/zigbee2mqtt/hassio-zigbee2mqtt">Zigbee2MQTT Addon</a> in case of USB Type Zigbee Coordinator.</li>
+</ul>
+<h2 id="zigbee2mqtt">zigbee2mqtt</h2>
+<h3 id="case-1-t-zigbee-board-as-coordinator">Case 1 : T-Zigbee board as coordinator</h3>
+<p>Select one of the T-ZigBee as the zigbee gateway, and program the program <a href="../zigbee2mqtt">zigbee2mqtt</a>. And follow the <a href="https://zbhci.readthedocs.io/en/latest/user-guide/zigbee2mqtt.html">documentation</a> for related configuration.</p>
+<h3 id="case-2-usb-type-coordinator-such-as-2538-usb-dongle-plus-etc-">Case 2 : USB type coordinator such as СС2538 USB Dongle plus etc.</h3>
+<p>If you are running Home Assistant OS or a Supervised Home Assistant instance the easiest way to install Zigbee2MQTT is via the addon. Instructions on how to install it can be found <a href="https://github.com/zigbee2mqtt/hassio-zigbee2mqtt#installation">here</a>.</p>
+<h2 id="ds18b20">ds18b20</h2>
+<p>Select T-ZigBee as the node. Do the following.</p>
+<h3 id="make-hardware">Make hardware</h3>
+<p>Connect the T-Zigbee board with DS18B20 sensor(s)</p>
+<p><img src="./docs/t-zigbee_sensor_hardware.jpg" alt=""></p>
+<h3 id="update-firmware">Update Firmware</h3>
+<p>Adjust the DIP switch:</p>
+<p><img src="../../docs/_static/upload_mode.png" alt=""></p>
+<p>Need to upgrade the firmware of TLSR8258 to <a href="../../firmware/hciDevice_ZR_8258_SDK_eb644f1_MD5_3e7c395bacca28475952808a79ff2ec1.bin">hciDevice_ZR_8258_SDK_eb644f1_MD5_3e7c395bacca28475952808a79ff2ec1.bin</a></p>
+<h3 id="upload-sketch">Upload Sketch</h3>
+<p>Adjust the DIP switch:</p>
+<p><img src="../../docs/_static/upload_mode_c3.png" alt=""></p>
+<p>Upload the <a href="./ds18b20.ino">ds18b20.ino</a> sketch after installing DS18B20 library from Arduino Library Manager or platformio Libraries menu.</p>
+<h2 id="pair">Pair</h2>
+<h3 id="case-1-t-zigbee-board-as-coordinator">Case 1 : T-Zigbee board as coordinator</h3>
+<ol>
+<li><p>Double-click the button on the upper side of the gateway to open the device join mode. Open successfully. The green led will be constant.</p>
+<p> <img src="../../docs/_static/user-guide/light-demo/permit_join.png" alt=""></p>
+</li>
+<li><p>Press and hold the button on the top of the node device for 3 seconds to start pairing. The green led will be constant, indicating that the pairing is complete.</p>
+<p> <img src="../../docs/_static/user-guide/light-demo/paired.png" alt=""></p>
+</li>
+</ol>
+<h3 id="case-2-usb-type-coordinator-such-as-2538-usb-dongle-plus-etc-">Case 2 : USB type coordinator such as СС2538 USB Dongle plus etc.</h3>
+<p>Zigbee2MQTT addon has a built-in webbased frontend. You can pair the device by clicking permit join button on the web before above pairing action on the board.<br/>
+    <img src="https://www.zigbee2mqtt.io/assets/img/frontend.e604ec0e.png" alt=""></p>
+<h2 id="home-assistant">Home Assistant</h2>
+<h3 id="case-1-t-zigbee-board-as-coordinator">Case 1 : T-Zigbee board as coordinator</h3>
+<p><img src="../../docs/_static/user-guide/light-demo/add-device_1.png" alt=""></p>
+<p><img src="../../docs/_static/user-guide/light-demo/add-device_2.png" alt=""></p>
+<p><img src="../../docs/_static/user-guide/light-demo/add-device_3.png" alt=""></p>
+<p><img src="./docs/add-sensor-device_1.png" alt=""></p>
+<h3 id="case-2-usb-type-coordinator-such-as-2538-usb-dongle-plus-etc-">Case 2 : USB type coordinator such as СС2538 USB Dongle plus etc.</h3>
+<p>Add this external converter <a href="./MIKE.ESP32-C3.js">MIKE.ESP32-C3.js</a> to Zigbee2MQTT config directory as to <a href="https://www.zigbee2mqtt.io/advanced/support-new-devices/01_support_new_devices.html#instructions">this procedure</a> and then join the device.
+You can show the device on the sumenus of Zigbee2MQTT.<br/>
+<img src="./docs/add-sensor-device_2.png" alt=""><br/><br/>
+<img src="./docs/add-sensor-device_3.png" alt=""></p>
+<p>Double-click the button on the upper side of the board to turn on/off automatic periodic reporting task.</p>
+</body></html>
