@@ -9,3 +9,28 @@ Zigbe2MQTT Settings:
 ![](img/esp32c3-tlsr8258_zigbee.png)  
 ![](img/ssd1306_tlsr8258-esp32c3.jpg)  
 ![](img/ssd1306_zigbee.jpg)  
+
+# Make firmware for ESP32-C3 LilyGo T-Zigbee 
+Before firmware update, adjust the DIP switch:  
+![](img/upload_mode_c3.png)
+  
+1) Install Platformio IDE as VSCode extension (https://platformio.org/install/ide?install=vscode)  
+![](img/ESP32C3_Flash_01.png)
+
+2) Set correct COM-port for firmware update  
+![](img/ESP32C3_Flash_02.png)
+
+3) Set correct COM-port for serial monitor  
+![](img/ESP32C3_Flash_03.png)
+
+4) Build and upload firmware  
+![](img/ESP32C3_Flash_04.png)
+
+5) The result might look like this  
+![](img/ESP32C3_Flash_05.png)
+
+6) Open serial monitor  
+![](img/ESP32C3_Flash_06.png)
+
+7) The result might look like this  
+![](img/ESP32C3_Flash_07.png)
