@@ -3,7 +3,7 @@ URL: https://github.com/mozolin/LilyGo_T-Zigbee_ESP32C3
 # LilyGo T-Zigbee ESP32-C3  
   
 Zigbe2MQTT Settings:  
-- [Example: Zigbee2MQTT CC2538 settings for ESP32-C3, ESP32-C6 and CC2530](https://github.com/mozolin/Zigbee2MQTT_CC2538)  
+[Example: Zigbee2MQTT CC2538 settings for ESP32-C3, ESP32-C6 and CC2530](https://github.com/mozolin/Zigbee2MQTT_CC2538)  
   
 ![](img/esp32c3-tlsr8258_zigbee.jpg)  
 ![](img/esp32c3-tlsr8258_zigbee.png)  
