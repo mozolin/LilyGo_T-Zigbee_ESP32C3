@@ -7,8 +7,6 @@ Zigbe2MQTT Settings:
   
 ![](img/esp32c3-tlsr8258_zigbee.jpg)  
 ![](img/esp32c3-tlsr8258_zigbee.png)  
-![](img/ssd1306_tlsr8258-esp32c3.jpg)  
-![](img/ssd1306_zigbee.jpg)  
 
 # Make firmware for ESP32-C3 LilyGo T-Zigbee 
 Before firmware update, adjust the DIP switch:  
@@ -34,3 +32,5 @@ Before firmware update, adjust the DIP switch:
 
 7) The result might look like this  
 ![](img/ESP32C3_Flash_07.png)
+![](img/ssd1306_tlsr8258-esp32c3.jpg)  
+![](img/ssd1306_zigbee.jpg)  
