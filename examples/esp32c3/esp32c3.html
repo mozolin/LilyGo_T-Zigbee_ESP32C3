@@ -15,8 +15,8 @@ a:hover {
 img {
   max-width: 550px;
 }</style>
-<title>DS18B20 Demo</title>
-</head><body><h1 id="ds18b20-demo">DS18B20 Demo</h1>
+<title>ESP32-C3 Demo</title>
+</head><body><h1 id="esp32c3-demo">ESP32C3 Demo</h1>
 <p>A zigbee router device. esp32-c3 controls zigbee behavior via zbhci.</p>
 <h2 id="hardware-required">Hardware Required</h2>
 <ul>
@@ -34,10 +34,10 @@ img {
 <p>Select one of the T-ZigBee as the zigbee gateway, and program the program <a href="../zigbee2mqtt">zigbee2mqtt</a>. And follow the <a href="https://zbhci.readthedocs.io/en/latest/user-guide/zigbee2mqtt.html">documentation</a> for related configuration.</p>
 <h3 id="case-2-usb-type-coordinator-such-as-2538-usb-dongle-plus-etc-">Case 2 : USB type coordinator such as СС2538 USB Dongle plus etc.</h3>
 <p>If you are running Home Assistant OS or a Supervised Home Assistant instance the easiest way to install Zigbee2MQTT is via the addon. Instructions on how to install it can be found <a href="https://github.com/zigbee2mqtt/hassio-zigbee2mqtt#installation">here</a>.</p>
-<h2 id="ds18b20">ds18b20</h2>
+<h2 id="esp32c3">esp32c3</h2>
 <p>Select T-ZigBee as the node. Do the following.</p>
 <h3 id="make-hardware">Make hardware</h3>
-<p>Connect the T-Zigbee board with DS18B20 sensor(s)</p>
+<p>Connect the T-Zigbee board with sensor(s)</p>
 <p><img src="./docs/t-zigbee_sensor_hardware.jpg" alt=""></p>
 <h3 id="update-firmware">Update Firmware</h3>
 <p>Adjust the DIP switch:</p>
@@ -46,7 +46,7 @@ img {
 <h3 id="upload-sketch">Upload Sketch</h3>
 <p>Adjust the DIP switch:</p>
 <p><img src="../../docs/_static/upload_mode_c3.png" alt=""></p>
-<p>Upload the <a href="./ds18b20.ino">ds18b20.ino</a> sketch after installing DS18B20 library from Arduino Library Manager or platformio Libraries menu.</p>
+<p>Upload the <a href="./esp32c3.ino">esp32c3.ino</a> sketch after installing sensor's libraries from Arduino Library Manager or platformio Libraries menu.</p>
 <h2 id="pair">Pair</h2>
 <h3 id="case-1-t-zigbee-board-as-coordinator">Case 1 : T-Zigbee board as coordinator</h3>
 <ol>

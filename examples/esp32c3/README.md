@@ -1,4 +1,4 @@
-# DS18B20 Demo
+# ESP32-C3 Demo
 
 A zigbee router device. esp32-c3 controls zigbee behavior via zbhci.
 
@@ -23,13 +23,13 @@ Select one of the T-ZigBee as the zigbee gateway, and program the program [zigbe
 
 If you are running Home Assistant OS or a Supervised Home Assistant instance the easiest way to install Zigbee2MQTT is via the addon. Instructions on how to install it can be found [here](https://github.com/zigbee2mqtt/hassio-zigbee2mqtt#installation).
 
-## ds18b20
+## esp32c3
 
 Select T-ZigBee as the node. Do the following.
 
 ### Make hardware
 
-Connect the T-Zigbee board with DS18B20 sensor(s)
+Connect the T-Zigbee board with sensor(s)
 
 ![](./docs/t-zigbee_sensor_hardware.jpg)
 
@@ -47,7 +47,7 @@ Adjust the DIP switch:
 
 ![](../../docs/_static/upload_mode_c3.png)
 
-Upload the [ds18b20.ino](./ds18b20.ino) sketch after installing DS18B20 library from Arduino Library Manager or platformio Libraries menu.
+Upload the [esp32c3.ino](./esp32c3.ino) sketch after installing sensor's libraries from Arduino Library Manager or platformio Libraries menu.
 
 ## Pair
 
