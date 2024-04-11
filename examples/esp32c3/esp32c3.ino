@@ -10,6 +10,7 @@
 #include <GyverOLED.h>
 #include <BH1750.h>
 #include <DallasTemperature.h>
+#include "vt_bme280"
 
 #include "zigbee_logo.h"
 #include "zigbee_connected.h"
@@ -37,9 +38,12 @@ uint8_t autoReport = 0;
 
 BH1750 bh1750(BH1750_ADDR);
 bool BH1750Inited = false;
-float lux = 0;
+float gIllum = 0;
 
-int16_t gIllum = 0, gHumid = 0, gPres = 0, gTemp = 0;
+using namespace vt;
+bme280_t bme280;
+float gHumid = 0, gPres = 0, gTemp = 0;
+bool BME280Inited = false;
 
 /**
  * Initialize a new OneButton instance for a button
@@ -76,7 +80,7 @@ void drawSSD1306()
     Y = 16 + idx * 12;
 
     if(strlen(ds18b20_str) > 0) {
-    	strcat(ds18b20_str, ",");
+      strcat(ds18b20_str, ",");
     }
     sprintf(ds18b20_int, "[%d]=%.2f", i, ((float)t)/100);
     strcat(ds18b20_str, ds18b20_int);
@@ -84,24 +88,24 @@ void drawSSD1306()
     oled.setCursorXY(X, Y);
     oled.print(ds18b20_str);
     if(i > 0 && (i+1) % 2 == 0) {
-    	idx++;
-    	strcpy(ds18b20_str, "");
-    	newLine = true;
+      idx++;
+      strcpy(ds18b20_str, "");
+      newLine = true;
     } else {
-    	newLine = false;
+      newLine = false;
     }
     oled.update();
   }
 
   if(!newLine) {
-  	//-- set cursor to new line
-  	idx++;
+    //-- set cursor to new line
+    idx++;
   }
-  //-- BMX280 sensor
+  //-- BME280 sensor
   X = 0;
   Y = 16 + idx * 12;
   oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", ((float)gTemp/100), ((float)gHumid/100), (float)gPres);
+  sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", gTemp, gHumid, gPres);
   oled.print(temp_data_str);
 
   //-- set cursor to new line
@@ -110,8 +114,8 @@ void drawSSD1306()
   X = 0;
   Y = 16 + idx * 12;
   oled.setCursorXY(X, Y);
-  //Serial.printf("lux on led: %.2f\n", lux);
-  sprintf(illum_data_str, "bh1750: %.2f", lux);
+  //Serial.printf("lux on led: %.2f\n", gIllum);
+  sprintf(illum_data_str, "bh1750: %.2f", gIllum);
   oled.print(illum_data_str);
   oled.update();
 }
@@ -141,10 +145,14 @@ void initSSD1306()
 void initBH1750()
 {
   if(bh1750.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, BH1750_ADDR, &Wire)) {
+    Serial.print(FONT_COLOR_GREEN);
     Serial.println(F("BH1750 initialized!"));
+    Serial.print(STYLE_COLOR_RESET);
     BH1750Inited = true;
   } else {
+    Serial.print(FONT_COLOR_RED);
     Serial.println(F("Error initialising BH1750..."));
+    Serial.print(STYLE_COLOR_RESET);
   }
 }
 
@@ -153,12 +161,40 @@ void getBH1750(void *pvParameters)
   while(1)
   {
     if(BH1750Inited) {
-      lux = bh1750.readLightLevel();
-      //Serial.printf("BH1750: Illuminance = %.2f lux in Endpoint #%d\n", lux, 666);
+      gIllum = bh1750.readLightLevel();
+      //Serial.printf("BH1750: Illuminance = %.2f lux in Endpoint #%d\n", gIllum, 666);
     }
     delay(5000);
   }
 }
+
+void initBME280()
+{
+  BME280Inited = (bool)bme280.begin();
+  if(BME280Inited) {
+    Serial.print(FONT_COLOR_GREEN);
+    Serial.println(F("BME280 initialized!"));
+    Serial.print(STYLE_COLOR_RESET);
+  } else {
+    Serial.print(FONT_COLOR_RED);
+    Serial.println(F("Error initialising BME280..."));
+    Serial.print(STYLE_COLOR_RESET);
+  }
+}
+void getBME280(void *pvParameters)
+{
+  while(1)
+  {
+    if(BME280Inited) {
+      gTemp = bme280.read_temperature_c();
+      gHumid = bme280.read_humidity();
+      gPres = bme280.read_pressure();
+      //Serial.printf("BME280: T=%.2fºC, H=%.2f%%, P=%.0fhPa\n", gTemp, gHumid, gPres);
+    }
+    delay(5000);
+  }
+}
+    
 
 void useSSD1306(void *pvParameters)
 {
@@ -292,7 +328,7 @@ void printAddress(DeviceAddress deviceAddress)
 
 void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data)
 {
-	//-- void zbhci_ZclSendReportCmd(
+  //-- void zbhci_ZclSendReportCmd(
   //--   uint8_t u8DstAddrMode,
   //--   ts_DstAddr sDstAddr,
   //--   uint8_t u8SrcEp,
@@ -306,25 +342,24 @@ void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data)
   //--   uint8_t *pu8Data
   //-- )
   zbhci_ZclSendReportCmd(
-  	ZCL_CMD_DST_ADDR_MODE,
-  	sDstAddr,
-  	u8SrcEp,
-  	1,
-  	ZCL_CMD_DISABLE_DEFAULT_RSP,
-  	ZCL_CMD_DIRECTION,
-  	u16ClusterID,
-  	ZCL_MEASURED_VALUE_ATTR_ID,
-  	ZCL_DATA_TYPE_DATA16,
-  	ZCL_CMD_DATA_LENGTH,
-  	//(uint8_t *)&pu8Data
-  	pu8Data
+    ZCL_CMD_DST_ADDR_MODE,
+    sDstAddr,
+    u8SrcEp,
+    1,
+    ZCL_CMD_DISABLE_DEFAULT_RSP,
+    ZCL_CMD_DIRECTION,
+    u16ClusterID,
+    ZCL_MEASURED_VALUE_ATTR_ID,
+    ZCL_DATA_TYPE_DATA16,
+    ZCL_CMD_DATA_LENGTH,
+    //(uint8_t *)&pu8Data
+    pu8Data
   );
   vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 void updateDs18b20Data(int flag)
 {
-  Serial.printf("***\n");
   /*
   if(flag == 1) {
     Serial.printf("DS18B20: updating (getDs18b20Data)...\n");
@@ -354,13 +389,13 @@ void updateDs18b20Data(int flag)
     Serial.printf("%d", i);
     Serial.print(STYLE_COLOR_RESET);
     
-    Serial.printf("): Temperature = ");
+    Serial.printf("): T = ");
     
     Serial.print(FONT_COLOR_STRONG_YELLOW);
     Serial.printf("%.2f", ((float)t)/100);
     Serial.print(STYLE_COLOR_RESET);
 
-    Serial.printf("ºC in Endpoint #");
+    Serial.printf(" ºC in Endpoint #");
     
     Serial.print(FONT_COLOR_STRONG_YELLOW);
     Serial.printf("%d", srcEpNum);
@@ -377,64 +412,76 @@ void updateDs18b20Data(int flag)
       printAddress(deviceAddress[i]);
       Serial.print(STYLE_COLOR_RESET);
     }
+    /*
     Serial.print(", resolution: ");
 
     Serial.print(FONT_COLOR_STRONG_YELLOW);
     ds18b20.setResolution(deviceAddress[i], TEMPERATURE_PRECISION);
     Serial.print(ds18b20.getResolution(deviceAddress[i]), DEC);
     Serial.print(STYLE_COLOR_RESET);
+    */
 
-    Serial.println();
+    Serial.print("\n");
     
-  	//-- DS18B20 Temperature Sensor
-  	zb_sendReport(srcEpNum, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&t);
+    //-- DS18B20 Temperature Sensor
+    zb_sendReport(srcEpNum, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&t);
   }
 
-  //-- BMX280 Temperature Sensor
-  gTemp = t;
-  zb_sendReport(6, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&gTemp);
+  //-- BME280 Temperature Sensor
+  int16_t tmpTemp = gTemp * 100;
+  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
   
-  //-- BMX280 Humidity Sensor
-  gHumid = t;
-  zb_sendReport(6, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&gHumid);
+  //-- BME280 Humidity Sensor
+  int16_t tmpHumid = gHumid * 100;
+  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
   
-  //-- BMX280 Pressure Sensor
-  gPres = t;
-  zb_sendReport(6, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&gPres);
+  //-- BME280 Pressure Sensor
+  int16_t tmpPres = gPres * 1;
+  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
   
   //-- BH1750 Illuminance Sensor
   //-- the real "lux" value is multiplied by 100 for correct conversion in the external Zigbee2MQTT converter
   //-- loot at MIKE.ESP32-C3.js: MIKE => just fixed output format: "XXX" => "(XXX / 100).toFixed(2)"
-  gIllum = lux * 100;
-  zb_sendReport(6, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&gIllum);
+  int16_t tmpIllum = gIllum * 100;
+  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
 
-  Serial.printf("BMX280|BH1750: ");
+  Serial.printf("BME280: T = ");
   
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%.2f", ((float)gTemp/100));
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%.2f", gTemp);
   Serial.print(STYLE_COLOR_RESET);
 
-  Serial.printf("ºC, ");
+  Serial.printf(" ºC, H = ");
   
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%.2f", ((float)gHumid/100));
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%.2f", gHumid);
   Serial.print(STYLE_COLOR_RESET);
 
-  Serial.printf("%%, ");
+  Serial.printf(" %%, P = ");
   
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%.0f", (float)gPres);
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%.0f", gPres);
   Serial.print(STYLE_COLOR_RESET);
 
-  Serial.printf("hPa | ");
+  Serial.printf(" hPa in Endpoint #");
   
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%.2f", ((float)gIllum/100));
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%d\n", BME280_BH1750_EP);
+  Serial.print(STYLE_COLOR_RESET);
+  
+  Serial.printf("BH1750: I = ");
+  
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%.2f", gIllum);
   Serial.print(STYLE_COLOR_RESET);
 
-  Serial.printf("lux\n");
-  //Serial.printf("BMX280|BH1750: %.2fºC, %.2f%%, %.0fhPa | %.2flux\n", ((float)gTemp/100), ((float)gHumid/100), (float)gPres, ((float)gIllum/100));
+  Serial.printf(" lux in Endpoint #");
 
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%d\n", BME280_BH1750_EP);
+  Serial.print(STYLE_COLOR_RESET);
+
+  Serial.printf("\n");
 }
 
 void getDs18b20Data()
@@ -571,7 +618,7 @@ void setup()
   
   Serial.begin(115200);
   delay(10);
-  Serial.printf("Init\n");
+  Serial.printf("\n");
 
   pinMode(CONFIG_ZIGBEE_MODULE_PIN, OUTPUT);
   digitalWrite(CONFIG_ZIGBEE_MODULE_PIN, HIGH);
@@ -581,12 +628,17 @@ void setup()
   digitalWrite(CONFIG_BLUE_LIGHT_PIN, LOW);
 
   ds18b20.begin();
-  Serial.print("Parasite power is: ");
+  /*
+  Serial.print("DS18B20: parasite power is: ");
   if(ds18b20.isParasitePowerMode()) {
+    Serial.print(FONT_COLOR_STRONG_GREEN);
     Serial.println("ON");
   } else {
+    Serial.print(FONT_COLOR_STRONG_RED);
     Serial.println("OFF");
   }
+  Serial.print(STYLE_COLOR_RESET);
+  */
 
   btn.attachClick(handleClick);
   btn.attachDoubleClick(handleDoubleClick);
@@ -598,10 +650,12 @@ void setup()
 
   initSSD1306();
   initBH1750();
+  initBME280();
 
   xTaskCreatePinnedToCore(zbhciTask, "zbhci", 4096, NULL, 5, NULL, ARDUINO_RUNNING_CORE);
   xTaskCreatePinnedToCore(useSSD1306, "useSSD1306", 4096, NULL, 10, NULL, ARDUINO_RUNNING_CORE);
   xTaskCreatePinnedToCore(getBH1750, "getBH1750", 4096, NULL, 15, NULL, ARDUINO_RUNNING_CORE);
+  xTaskCreatePinnedToCore(getBME280, "getBME280", 4096, NULL, 20, NULL, ARDUINO_RUNNING_CORE);
 
   // zbhci_BdbFactoryReset();
   delay(100);

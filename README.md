@@ -1,6 +1,6 @@
 URL: https://github.com/mozolin/LilyGo_T-Zigbee_ESP32C3  
   
-# Example: DS18B20 & BH1750 sensors with LilyGo T-Zigbee ESP32C3 (Platformio IDE)
+# Example: DS18B20 & BME280 & BH1750 sensors with LilyGo T-Zigbee ESP32C3 (Platformio IDE)
   
 Zigbe2MQTT Settings:  
 [Example: Zigbee2MQTT CC2538 settings for ESP32-C3, ESP32-C6 and CC2530](https://github.com/mozolin/Zigbee2MQTT_CC2538)  

@@ -36,6 +36,9 @@
 #define ZCL_CMD_DISABLE_DEFAULT_RSP   0
 //-- Data length
 #define ZCL_CMD_DATA_LENGTH           2
+//-- Endpint for BME280/BH1750 sensors
+#define BME280_BH1750_EP              6
+
 
 //-- Zigbee: ID of clusters
 #define ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT            0x0400
