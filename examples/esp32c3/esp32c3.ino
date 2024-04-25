@@ -11,14 +11,9 @@
 #include <BH1750.h>
 #include <DallasTemperature.h>
 #include "vt_bme280"
-#if USE_FIRST_PIR_SENSOR
-  #include "pir.h"
-#endif
-#if USE_SECOND_PIR_SENSOR
-  #include "pir2.h"
-#endif
+#include "pir.h"
 #include <MQUnifiedsensor.h>
-
+#include "Adafruit_BME680.h"
 
 //-- pictures
 #include "images/danger_image.h"
@@ -30,13 +25,16 @@
 #include "images/zigbee_disconnected.h"
 #include "images/zigbee_image.h"
 
+#if MIKE_BOARD_NUMBER == 1
 //-- GPIO where the DS18B20 is connected to
 const int oneWireBus = ONE_WIRE_BUS_GPIO;
 //-- Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(oneWireBus);
 //-- Pass our oneWire reference to Dallas Temperature sensor 
 DallasTemperature ds18b20(&oneWire);
+
 DeviceAddress deviceAddress[8];
+#endif
 
 const uint8_t au8ManufacturerName[] = {13,'M','I','K','E','.','E','S','P','3','2','-','C','3'};
 ts_DstAddr sDstAddr;
@@ -45,7 +43,7 @@ uint8_t numDevices = 0;
 
 GyverOLED<SSD1306_128x64> oled(SSD1306_OLED_ADDRESS);
 int screenNumber = 1;
-bool oledTestScreen = true;
+bool oledTestScreen = false;
 
 uint8_t ledState = 0;
 uint8_t netState = 0;
@@ -63,14 +61,8 @@ float
   bme280Temp = 0;
 bool BME280Inited = false;
 
-#if USE_FIRST_PIR_SENSOR
-  //-- PIR Occupancy Sensor
-  bool hcsr501MotionState = false;
-#endif
-#if USE_SECOND_PIR_SENSOR
-  //-- PIR Occupancy Sensor #2
-  bool rcwl0516MotionState = false;
-#endif
+//-- PIR Occupancy Sensor
+bool pirDeviceMotionState = false;
 
 MQUnifiedsensor MQ135(
   CHIP_NAME,
@@ -93,129 +85,148 @@ float
   mq135GasNH4,
   mq135GasAceton;
 
+float
+  hcsr04DistanceCm,
+  hcsr04DistanceInch;
+
 
 float
-	hcsr04DistanceCm,
-	hcsr04DistanceInch;
-
+  bme680Humid = 0,
+  bme680Pres = 0,
+  bme680Temp = 0,
+  bme680Gas = 0,
+  bme680Alt = 0;
+bool BME680Inited = false;
+Adafruit_BME680 bme680;
 
 //-- param #1: Input pin for the button
 //-- param #2: Button is active LOW
 //-- param #3: Enable internal pull-up resistor
-OneButton btn = OneButton(CONFIG_USR_BUTTON_PIN, true, true); 
+OneButton btn = OneButton(EXTERNAL_BUTTON_GPIO, true, true); 
 
 void drawSSD1306()
 {
   if(oledTestScreen) {
-  	mq135GasCO2 = 1083;
-  	mq135CO2Exceeded1000 = true;
-  	hcsr501MotionState = true;
+    #if MIKE_BOARD_NUMBER == 2
+      mq135GasCO2 = 1083;
+      mq135CO2Exceeded1000 = true;
+    #endif
+    pirDeviceMotionState = true;
   }
   
   //oled.clear();
-  
-  numDevices = ds18b20.getDS18Count();
-
   int16_t t = 0, X = 0, Y = 0;
-  char temp_data_str[100] = {0};
-  char illum_data_str[100] = {0};
-
-  char ds18b20_str[200] = {0};
-  char ds18b20_int[10] = {0};
-    
-  //-- MQ135 gas sensor
-  //-- the first row on yellow
-  oled.home();
-  oled.rect(0, 0, 77, 7, OLED_CLEAR);
-  sprintf(temp_data_str, "CO2=%d", (int)mq135GasCO2);
-  oled.print(temp_data_str);
   
-  //-- HC-SR04 distance sensor
-  //-- the second row on yellow
-  oled.rect(0, 8, 77, 15, OLED_CLEAR);
-  oled.setCursorXY(0, 8);
-  sprintf(temp_data_str, "D=%.2f", hcsr04DistanceCm);
-  oled.print(temp_data_str);
+  char temp_data_str[100] = {0};
+    
+  X = 0; Y = 0;
+  oled.setCursorXY(X, Y);
+  sprintf(temp_data_str, "Board #%d", MIKE_BOARD_NUMBER);
+  oled.print(temp_data_str);  
+  
+  #if MIKE_BOARD_NUMBER == 2
+    //-- MQ135 gas sensor
+    //-- the first row on yellow
+    oled.home();
+    oled.rect(0, 0, 77, 7, OLED_CLEAR);
+    sprintf(temp_data_str, "CO2=%d", (int)mq135GasCO2);
+    oled.print(temp_data_str);
+  
+    //-- HC-SR04 distance sensor
+    //-- the second row on yellow
+    oled.rect(0, 8, 77, 15, OLED_CLEAR);
+    oled.setCursorXY(0, 8);
+    sprintf(temp_data_str, "D=%.2f", hcsr04DistanceCm);
+    oled.print(temp_data_str);
+  #endif
 
   oled.update();
   
-  //-- DS18B20 temperature sensors
-  int idx = 0;
-  bool newLine = false;
-  for(int i = 0; i < numDevices; ++i) {
-    t = ds18b20.getTempCByIndex(i) * 100;
-    X = 0;
-    Y = 16 + idx * 8;
-
-    if(strlen(ds18b20_str) > 0) {
-      strcat(ds18b20_str, ", ");
-    }
-    sprintf(ds18b20_int, "T%d=%.2f", i, ((float)t)/100);
-    strcat(ds18b20_str, ds18b20_int);
+  #if MIKE_BOARD_NUMBER == 1
+    //-- DS18B20 temperature sensors
+    numDevices = ds18b20.getDS18Count();
     
-    oled.setCursorXY(X, Y);
-    oled.print(ds18b20_str);
-    if(i > 0 && (i+1) % 2 == 0) {
+    char ds18b20_str[200] = {0};
+    char ds18b20_int[10] = {0};
+    int idx = 0;
+    bool newLine = false;
+    for(int i = 0; i < numDevices; ++i) {
+      t = ds18b20.getTempCByIndex(i) * 100;
+      X = 0;
+      Y = 16 + idx * 8;
+    
+      if(strlen(ds18b20_str) > 0) {
+        strcat(ds18b20_str, ", ");
+      }
+      sprintf(ds18b20_int, "T%d=%.2f", i, ((float)t)/100);
+      strcat(ds18b20_str, ds18b20_int);
+      
+      oled.setCursorXY(X, Y);
+      oled.print(ds18b20_str);
+      if(i > 0 && (i+1) % 2 == 0) {
+        idx++;
+        strcpy(ds18b20_str, "");
+        newLine = true;
+      } else {
+        newLine = false;
+      }
+      //oled.update();
+    }
+    
+    if(!newLine) {
+      //-- set cursor to new line
       idx++;
-      strcpy(ds18b20_str, "");
-      newLine = true;
-    } else {
-      newLine = false;
     }
-    //oled.update();
-  }
+ 
+   	//-- BH1750 illuminance sensor
+    oled.rect(0, 32, 127, 39, OLED_CLEAR);
+    oled.setCursorXY(0, 32);
+		sprintf(temp_data_str, "I=%.2f", bh1750Illum);
+		oled.print(temp_data_str);
 
-  if(!newLine) {
-    //-- set cursor to new line
-    idx++;
-  }
-  //-- BME280 sensor
-  //oled.setCursorXY(0, 16 + idx * 9);
-  oled.setCursorXY(0, 32);
-  sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", bme280Temp, bme280Humid, bme280Pres);
-  oled.print(temp_data_str);
+    //-- BME280 sensor
+    oled.rect(0, 40, 127, 47, OLED_CLEAR);
+    oled.setCursorXY(0, 40);
+    sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", bme280Temp, bme280Humid, bme280Pres);
+    oled.print(temp_data_str);
+    
+    //-- BME680 sensor
+  	oled.rect(0, 48, 127, 55, OLED_CLEAR);
+  	oled.setCursorXY(0, 48);
+  	sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", bme680Temp, bme680Humid, bme680Pres);
+  	oled.print(temp_data_str);
 
-  //-- set cursor to new line
-  idx++;
-  //-- BH1750 illuminance sensor
-  //oled.setCursorXY(0, 20 + idx * 9);
-  oled.setCursorXY(0, 40);
-  sprintf(temp_data_str, "I=%.2f", bh1750Illum);
-  oled.print(temp_data_str);
-  
+  	//-- BME680: gas & altitude in the last row
+  	oled.rect(0, 56, 127, 63, OLED_CLEAR);
+    oled.setCursorXY(0, 56);
+   	sprintf(temp_data_str, "%.2fkOm, %.2fm", bme680Gas, bme680Alt);
+  	oled.print(temp_data_str);
+  #endif
   //-- draw icons in the header
-  #if USE_FIRST_PIR_SENSOR
-    if(hcsr501MotionState) {
-      oled.drawBitmap(94, 0, motion_image, 16, 16);
-    } else {
-      oled.rect(94, 0, 108, 15, OLED_CLEAR);      
-    }
-  #endif
-  #if USE_SECOND_PIR_SENSOR
-    if(rcwl0516MotionState) {
-      oled.drawBitmap(94, 0, motion_image, 16, 16);
-    } else {
-      oled.rect(94, 0, 108, 15, OLED_CLEAR);      
-    }
-  #endif
-  
-  if(mq135CO2Exceeded1000) {
-    //oled.drawBitmap(78, 0, toxic_image, 16, 16);
-    oled.drawBitmap(78, 0, danger_image, 16, 16);
-    //-- header: CO2 big text
-    /*
-    oled.setCursor(0, 0);
-  	oled.setScale(2);
-  	oled.print("CO");
-  	oled.setScale(1);
-  	oled.setCursorXY(24, 6);
-  	oled.print("2");
-  	*/
+  if(pirDeviceMotionState) {
+    oled.drawBitmap(94, 0, motion_image, 16, 16);
   } else {
-    //-- clear header row: from 0 to the end of "danger_image" icon
-    oled.rect(78, 0, 88, 15, OLED_CLEAR);
+    oled.rect(94, 0, 108, 15, OLED_CLEAR);
   }
-
+  
+  #if MIKE_BOARD_NUMBER == 2
+    if(mq135CO2Exceeded1000) {
+      //oled.drawBitmap(78, 0, toxic_image, 16, 16);
+      oled.drawBitmap(78, 0, danger_image, 16, 16);
+      //-- header: CO2 big text
+      /*
+      oled.setCursor(0, 0);
+      oled.setScale(2);
+      oled.print("CO");
+      oled.setScale(1);
+      oled.setCursorXY(24, 6);
+      oled.print("2");
+      */
+    } else {
+      //-- clear header row: from 0 to the end of "danger_image" icon
+      oled.rect(78, 0, 88, 15, OLED_CLEAR);
+    }
+  #endif
   //-- redraw Zigbee icons
   oled.drawBitmap(112, 48, zigbee_image, 16, 16);
   oled.drawBitmap(112, 0, zigbee_connected, 16, 16);
@@ -225,38 +236,57 @@ void drawSSD1306()
 
 void drawSSD1306_02()
 {
-	int16_t X = 0, Y = 0;
+  int16_t X = 0, Y = 0;
   char temp_data_str[100] = {0};
 
   X = 0; Y = 0;
   oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "DS18B20:pin%d,ep1-%d", ONE_WIRE_BUS_GPIO, numDevices);
-  oled.print(temp_data_str);
+  sprintf(temp_data_str, "Board #%d", MIKE_BOARD_NUMBER);
+  oled.print(temp_data_str);  
 
-  X = 0; Y = 8;
-  oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "BME280:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME280_BH1750_EP);
-  oled.print(temp_data_str);
-  
-  X = 0; Y = 16;
-  oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "BH1750:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME280_BH1750_EP);
-  oled.print(temp_data_str);
-  
-  X = 0; Y = 24;
-  oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "HCSR501:pin%d,led%d", HCSR501_SENSOR_GPIO, PIR_SENSOR_LED_GPIO);
-  oled.print(temp_data_str);
+  #if MIKE_BOARD_NUMBER == 1
+    X = 0; Y = 16;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "DS18B20:pin%d,ep1-%d", ONE_WIRE_BUS_GPIO, numDevices);
+    oled.print(temp_data_str);
+    
+    X = 0; Y = 24;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "BME280:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME280_BH1750_EP);
+    oled.print(temp_data_str);
+    
+    X = 0; Y = 32;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "BH1750:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME280_BH1750_EP);
+    oled.print(temp_data_str);
+    
+    X = 0; Y = 40;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "BME680:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME680_EP);
+    oled.print(temp_data_str);
 
-  X = 0; Y = 32;
-  oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "MQ135:pin%d", MQ135_SENSOR_GPIO);
-  oled.print(temp_data_str);
+    X = 0; Y = 48;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "HCSR501:pin%d,led%d", PIR_SENSOR_GPIO, PIR_SENSOR_LED_GPIO);
+    oled.print(temp_data_str);
+  #endif
 
-  X = 0; Y = 40;
-  oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "HCSR04:trig%d, echo%d", HCSR04_TRIGGER_GPIO, HCSR04_ECHO_GPIO);
-  oled.print(temp_data_str);
+  #if MIKE_BOARD_NUMBER == 2
+    X = 0; Y = 16;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "MQ135:pin%d", MQ135_SENSOR_GPIO);
+    oled.print(temp_data_str);
+    
+    X = 0; Y = 24;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "HCSR04:trig%d, echo%d", HCSR04_TRIGGER_GPIO, HCSR04_ECHO_GPIO);
+    oled.print(temp_data_str);
+
+    X = 0; Y = 32;
+    oled.setCursorXY(X, Y);
+    sprintf(temp_data_str, "RCWL0516:pin%d,led%d", PIR_SENSOR_GPIO, PIR_SENSOR_LED_GPIO);
+    oled.print(temp_data_str);
+  #endif
 
   oled.update();
 
@@ -270,19 +300,22 @@ void drawSSD1306_02()
 
 void initLEDsOnBoard()
 {
-  pinMode(CONFIG_ZIGBEE_MODULE_PIN, OUTPUT);
-  digitalWrite(CONFIG_ZIGBEE_MODULE_PIN, HIGH);
+  pinMode(RED_LED_ONBOARD_PIN, OUTPUT);
+  digitalWrite(RED_LED_ONBOARD_PIN, HIGH);
   delay(500);
 
-  pinMode(CONFIG_BLUE_LIGHT_PIN, OUTPUT);
-  digitalWrite(CONFIG_BLUE_LIGHT_PIN, LOW);
+  pinMode(BLUE_LED_ONBOARD_PIN, OUTPUT);
+  digitalWrite(BLUE_LED_ONBOARD_PIN, LOW);
 }
 
 void initSSD1306()
 {
+  //Serial.printf("SSD #1\n");
   oled.init(ESP32_SDA_PIN, ESP32_SCL_PIN);
-  // настройка скорости I2C
+  //Serial.printf("SSD #2\n");
+  //-- set I2C speed
   Wire.setClock(ESP32_I2C_CLOCK_SPEED);
+  //Serial.printf("SSD #3\n");
   
   //-- logo at start
   oled.clear();
@@ -300,6 +333,7 @@ void initSSD1306()
   //oled.drawBitmap(112, 0, zigbee_connected, 16, 16);
 }
 
+#if MIKE_BOARD_NUMBER == 1
 void initDS18B20()
 {
   ds18b20.begin();
@@ -363,21 +397,62 @@ void getBME280(void *pvParameters)
       bme280Temp = bme280.read_temperature_c();
       bme280Humid = bme280.read_humidity();
       bme280Pres = bme280.read_pressure();
-      //Serial.printf("BME280: T=%.2fºC, H=%.2f%%, P=%.0fhPa\n", bme280Temp, bme280Humid, bme280Pres);
     }
     delay(5000);
   }
 }
 
+void initBME680()
+{
+  BME680Inited = (bool)bme680.begin();
+  if(BME680Inited) {
+    Serial.print(FONT_COLOR_GREEN);
+    Serial.println(F("BME680 initialized!"));
+    Serial.print(STYLE_COLOR_RESET);
+
+    // Set up oversampling and filter initialization
+    bme680.setTemperatureOversampling(BME680_OS_8X);
+    bme680.setHumidityOversampling(BME680_OS_2X);
+    bme680.setPressureOversampling(BME680_OS_4X);
+    bme680.setIIRFilterSize(BME680_FILTER_SIZE_3);
+    bme680.setGasHeater(320, 150); // 320*C for 150 ms
+
+  } else {
+    Serial.print(FONT_COLOR_RED);
+    Serial.println(F("BME680 initialization error..."));
+    Serial.print(STYLE_COLOR_RESET);
+  }
+}
+void getBME680(void *pvParameters)
+{
+  while(1)
+  {
+    if(BME680Inited) {
+      if(!bme680.performReading()) {
+				Serial.println("Failed to perform reading BME680!");
+      } else {
+      	bme680Humid = bme680.humidity;
+  			bme680Pres  = bme680.pressure / 100.0;
+  			bme680Temp  = bme680.temperature;
+  			bme680Gas   = bme680.gas_resistance / 1000.0;
+  			bme680Alt   = bme680.readAltitude(BME680_SEA_LEVEL_PRESSURE);
+      }
+    }
+    delay(5000);
+  }
+}
+#endif
+
+#if MIKE_BOARD_NUMBER == 2
 void initHCSR04()
 {
-	pinMode(HCSR04_TRIGGER_GPIO, OUTPUT); // Sets the trigPin as an Output
+  pinMode(HCSR04_TRIGGER_GPIO, OUTPUT); // Sets the trigPin as an Output
   pinMode(HCSR04_ECHO_GPIO, INPUT); // Sets the echoPin as an Input
 }
 void getHCSR04(void *pvParameters)
 {
-	while(1) {
-		//-- Clears the HCSR04_TRIGGER_GPIO
+  while(1) {
+    //-- Clears the HCSR04_TRIGGER_GPIO
     digitalWrite(HCSR04_TRIGGER_GPIO, LOW);
     delayMicroseconds(2);
     //-- Sets the HCSR04_TRIGGER_GPIO on HIGH state for 10 micro seconds
@@ -396,18 +471,19 @@ void getHCSR04(void *pvParameters)
     delay(5000);
   }
 }
+#endif
 
 void useSSD1306(void *pvParameters)
 {
   while(1)
   {
     if(screenNumber == 2) {
-	    //-- switch to the second screen
-  	  drawSSD1306_02();
+      //-- switch to the second screen
+      drawSSD1306_02();
     } else {
-	  	//-- switch to default screen
-  		drawSSD1306();
-  	}
+      //-- switch to default screen
+      drawSSD1306();
+    }
     delay(5000);
     
     /*
@@ -502,14 +578,14 @@ void useSSD1306(void *pvParameters)
 
 void BlinkLedOnBoard(int type)
 {
-  int LED_PIN_COLOR = CONFIG_BLUE_LIGHT_PIN;
+  int LED_PIN_COLOR = BLUE_LED_ONBOARD_PIN;
   //-- Blue
   if(type == 1) {
-    LED_PIN_COLOR = CONFIG_BLUE_LIGHT_PIN;
+    LED_PIN_COLOR = BLUE_LED_ONBOARD_PIN;
   }
   //-- Red
   if(type == 2) {
-    LED_PIN_COLOR = CONFIG_ZIGBEE_MODULE_PIN;
+    LED_PIN_COLOR = RED_LED_ONBOARD_PIN;
   }
   //-- light ON
   digitalWrite(LED_PIN_COLOR, true);
@@ -520,7 +596,8 @@ void BlinkLedOnBoard(int type)
   digitalWrite(LED_PIN_COLOR, false);
 }
 
-//-- function to print a device address
+#if MIKE_BOARD_NUMBER == 1
+//-- function to print DS18B20 address
 void printAddress(DeviceAddress deviceAddress)
 {
   for (uint8_t i = 0; i < 8; i++) {
@@ -531,7 +608,7 @@ void printAddress(DeviceAddress deviceAddress)
     Serial.print(deviceAddress[i], HEX);
   }
 }
-
+#endif
 
 void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data)
 {
@@ -567,278 +644,293 @@ void updateAttributes(int flag)
   //-- int type: 1 = Blue, 2 = Red
   BlinkLedOnBoard(1);
 
-  ds18b20.requestTemperatures();
-  //uint8_t d = ds18b20.getDeviceCount();
-  //Serial.printf("TOTAL DEVICES: %d\n", d);
-  numDevices = ds18b20.getDS18Count();
+  #if MIKE_BOARD_NUMBER == 1
+    ds18b20.requestTemperatures();
+    //uint8_t d = ds18b20.getDeviceCount();
+    //Serial.printf("TOTAL DEVICES: %d\n", d);
+    numDevices = ds18b20.getDS18Count();
+    
+    int16_t t = 0;
+    int srcEpNum = 0;
+    int dstEpNum = 1;
+    
+    for(int i = 0; i < numDevices; ++i) {
+      t = ds18b20.getTempCByIndex(i) * 100;
+      srcEpNum = i + 1;
+      Serial.printf("DS18B20[");
+      
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+      Serial.printf("%d", i);
+      Serial.print(STYLE_COLOR_RESET);
+      
+      Serial.printf("] (GPIO=");
+      Serial.print(FONT_COLOR_STRONG_CYAN);
+      Serial.printf("%d", ONE_WIRE_BUS_GPIO);
+      Serial.print(STYLE_COLOR_RESET);
+      Serial.printf("): T = ");
+      
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+      Serial.printf("%.2f", ((float)t)/100);
+      Serial.print(STYLE_COLOR_RESET);
+    
+      Serial.printf(" ºC in Endpoint #");
+      
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+      Serial.printf("%d", srcEpNum);
+      Serial.print(STYLE_COLOR_RESET);
+      
+      if(!ds18b20.getAddress(deviceAddress[i], i)) {
+        Serial.printf(", ");
+        Serial.print(FONT_COLOR_STRONG_RED);
+        Serial.printf("unable to find address!");
+        Serial.print(STYLE_COLOR_RESET);
+      } else {
+        Serial.printf(", addr: ");
+        Serial.print(FONT_COLOR_STRONG_YELLOW);
+        printAddress(deviceAddress[i]);
+        Serial.print(STYLE_COLOR_RESET);
+      }
+      /*
+      Serial.print(", resolution: ");
+    
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+      ds18b20.setResolution(deviceAddress[i], TEMPERATURE_PRECISION);
+      Serial.print(ds18b20.getResolution(deviceAddress[i]), DEC);
+      Serial.print(STYLE_COLOR_RESET);
+      */
+    
+      Serial.print("\n");
+      
+      //-- DS18B20 Temperature Sensor
+      zb_sendReport(srcEpNum, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&t);
+    }
+    
+    //-- BME280 Temperature Sensor
+    int16_t tmpTemp = bme280Temp * 100;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
+    
+    //-- BME280 Humidity Sensor
+    int16_t tmpHumid = bme280Humid * 100;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
+    
+    //-- BME280 Pressure Sensor
+    int16_t tmpPres = bme280Pres * 1;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
+    
+    
+    //-- BME680 Temperature Sensor
+    int16_t tmpTemp2 = bme680Temp * 100;
+    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp2);
+    
+    //-- BME680 Humidity Sensor
+    int16_t tmpHumid2 = bme680Humid * 100;
+    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid2);
+    
+    //-- BME680 Pressure Sensor
+    int16_t tmpPres2 = bme680Pres * 1;
+    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres2);
+ 
+    //-- BH1750 Illuminance Sensor
+    //-- the real "lux" value is multiplied by 100 for correct conversion in the external Zigbee2MQTT converter
+    //-- loot at MIKE.ESP32-C3.js: MIKE => just fixed output format: "XXX" => "(XXX / 100).toFixed(2)"
+    int16_t tmpIllum = bh1750Illum * 100;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
+  #endif
 
-  int16_t t = 0;
-  int srcEpNum = 0;
-  int dstEpNum = 1;
-  
-  for(int i = 0; i < numDevices; ++i) {
-    t = ds18b20.getTempCByIndex(i) * 100;
-    srcEpNum = i + 1;
-    Serial.printf("DS18B20[");
-    
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d", i);
-    Serial.print(STYLE_COLOR_RESET);
-    
-    Serial.printf("] (GPIO=");
+  //-- PIR Occupancy Sensor
+  pirDeviceMotionState = getPIRState_asLib();
+  int16_t tmpOccup = pirDeviceMotionState * 1;
+  zb_sendReport(PIR_EP, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup);
+
+  #if MIKE_BOARD_NUMBER == 2
+    if(mq135Inited) {
+       //-- MQ135 Gas Sensor
+      int16_t tmpPPM = (int)mq135GasCO2;
+      zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpPPM);
+    }
+  #endif
+
+  #if MIKE_BOARD_NUMBER == 1
+    Serial.printf("BME280 (SDA=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
-    Serial.printf("%d", ONE_WIRE_BUS_GPIO);
+    Serial.printf("%d", ESP32_SDA_PIN);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", SCL=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", ESP32_SCL_PIN);
     Serial.print(STYLE_COLOR_RESET);
     Serial.printf("): T = ");
-    
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%.2f", ((float)t)/100);
+    Serial.printf("%.2f", bme280Temp);
     Serial.print(STYLE_COLOR_RESET);
-
-    Serial.printf(" ºC in Endpoint #");
-    
+    Serial.printf(" ºC, H = ");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d", srcEpNum);
+    Serial.printf("%.2f", bme280Humid);
     Serial.print(STYLE_COLOR_RESET);
-    
-    if(!ds18b20.getAddress(deviceAddress[i], i)) {
-      Serial.printf(", ");
-      Serial.print(FONT_COLOR_STRONG_RED);
-      Serial.printf("unable to find address!");
-      Serial.print(STYLE_COLOR_RESET);
-    } else {
-      Serial.printf(", addr: ");
-      Serial.print(FONT_COLOR_STRONG_YELLOW);
-      printAddress(deviceAddress[i]);
-      Serial.print(STYLE_COLOR_RESET);
-    }
-    /*
-    Serial.print(", resolution: ");
-
+    Serial.printf(" %%, P = ");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    ds18b20.setResolution(deviceAddress[i], TEMPERATURE_PRECISION);
-    Serial.print(ds18b20.getResolution(deviceAddress[i]), DEC);
+    Serial.printf("%.0f", bme280Pres);
     Serial.print(STYLE_COLOR_RESET);
-    */
-
-    Serial.print("\n");
+    Serial.printf(" hPa in Endpoint #");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%d\n", BME280_BH1750_EP);
+    Serial.print(STYLE_COLOR_RESET);
     
-    //-- DS18B20 Temperature Sensor
-    zb_sendReport(srcEpNum, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&t);
-  }
-
-  //-- BME280 Temperature Sensor
-  int16_t tmpTemp = bme280Temp * 100;
-  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
-  
-  //-- BME280 Humidity Sensor
-  int16_t tmpHumid = bme280Humid * 100;
-  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
-  
-  //-- BME280 Pressure Sensor
-  int16_t tmpPres = bme280Pres * 1;
-  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
-  
-  //-- BH1750 Illuminance Sensor
-  //-- the real "lux" value is multiplied by 100 for correct conversion in the external Zigbee2MQTT converter
-  //-- loot at MIKE.ESP32-C3.js: MIKE => just fixed output format: "XXX" => "(XXX / 100).toFixed(2)"
-  int16_t tmpIllum = bh1750Illum * 100;
-  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
-
-  #if USE_FIRST_PIR_SENSOR
-    //-- PIR Occupancy Sensor
-    hcsr501MotionState = getPIRState_asLib();
-    int16_t tmpOccup = hcsr501MotionState * 1;
-    zb_sendReport(HCSR501_EP, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup);
+    Serial.printf("BME680 (SDA=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", ESP32_SDA_PIN);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", SCL=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", ESP32_SCL_PIN);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf("): T = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.2f", bme680Temp);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(" ºC, H = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.2f", bme680Humid);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(" %%, P = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.0f", bme680Pres);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(" hPa, Gas = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.2f", bme680Gas);
+    Serial.print(STYLE_COLOR_RESET);
+    //Serial.printf(" KOhms, Altitude = ");
+    Serial.printf(" KΩ, Altitude = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+  	Serial.printf("%.2f", bme680Alt);
+  	Serial.print(STYLE_COLOR_RESET);
+  	Serial.printf(" m in Endpoint #");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%d\n", BME280_BH1750_EP);
+    Serial.print(STYLE_COLOR_RESET);
+    
+    Serial.printf("BH1750 (SDA=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", ESP32_SDA_PIN);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", SCL=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", ESP32_SCL_PIN);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf("): I = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.2f", bh1750Illum);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(" lux in Endpoint #");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%d\n", BME280_BH1750_EP);
+    Serial.print(STYLE_COLOR_RESET);
   #endif
 
-  #if USE_SECOND_PIR_SENSOR
-    //-- PIR Occupancy Sensor #2
-    rcwl0516MotionState = getPIR2State_asLib();
-    int16_t tmpOccup2 = rcwl0516MotionState * 1;
-    zb_sendReport(RCWL0516_EP, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup2);
-  #endif
-
-  if(mq135Inited) {
-	  //-- MQ135 Gas Sensor
-  	int16_t tmpPPM = (int)mq135GasCO2;
-	  zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpPPM);
-  }
-
-  Serial.printf("BME280 (SDA=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", ESP32_SDA_PIN);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", SCL=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", ESP32_SCL_PIN);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf("): T = ");
-  
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%.2f", bme280Temp);
-  Serial.print(STYLE_COLOR_RESET);
-
-  Serial.printf(" ºC, H = ");
-  
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%.2f", bme280Humid);
-  Serial.print(STYLE_COLOR_RESET);
-
-  Serial.printf(" %%, P = ");
-  
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%.0f", bme280Pres);
-  Serial.print(STYLE_COLOR_RESET);
-
-  Serial.printf(" hPa in Endpoint #");
-  
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%d\n", BME280_BH1750_EP);
-  Serial.print(STYLE_COLOR_RESET);
-  
-  Serial.printf("BH1750 (SDA=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", ESP32_SDA_PIN);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", SCL=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", ESP32_SCL_PIN);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf("): I = ");
-  
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%.2f", bh1750Illum);
-  Serial.print(STYLE_COLOR_RESET);
-
-  Serial.printf(" lux in Endpoint #");
-
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%d\n", BME280_BH1750_EP);
-  Serial.print(STYLE_COLOR_RESET);
-  
-  #if USE_FIRST_PIR_SENSOR
+  #if MIKE_BOARD_NUMBER == 1
     Serial.printf("HC-SR501 (GPIO=");
-    Serial.print(FONT_COLOR_STRONG_CYAN);
-    Serial.printf("%d", HCSR501_SENSOR_GPIO);
-    Serial.print(STYLE_COLOR_RESET);
-    Serial.printf(", LED=");
-    Serial.print(FONT_COLOR_STRONG_CYAN);
-    Serial.printf("%d", PIR_SENSOR_LED_GPIO);
-    Serial.print(STYLE_COLOR_RESET);
-    Serial.printf("): State = ");
-    if(hcsr501MotionState) {
-      Serial.print(FONT_COLOR_STRONG_RED);
-    } else {
-      Serial.print(FONT_COLOR_STRONG_GREEN);
-    }
-    Serial.printf("%s", hcsr501MotionState ? "ON" : "OFF");
-    Serial.print(STYLE_COLOR_RESET);
-    Serial.printf(" in Endpoint #");
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", HCSR501_EP);
-    Serial.print(STYLE_COLOR_RESET);
-  #endif
-
-  #if USE_SECOND_PIR_SENSOR
+  #else
     Serial.printf("RCWL-0516 (GPIO=");
-    Serial.print(FONT_COLOR_STRONG_CYAN);
-    Serial.printf("%d", RCWL0516_SENSOR_GPIO);
-    Serial.print(STYLE_COLOR_RESET);
+  #endif
+  Serial.print(FONT_COLOR_STRONG_CYAN);
+  Serial.printf("%d", PIR_SENSOR_GPIO);
+  Serial.print(STYLE_COLOR_RESET);
+  #if MIKE_BOARD_NUMBER == 1
     Serial.printf(", LED=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
     Serial.printf("%d", PIR_SENSOR_LED_GPIO);
     Serial.print(STYLE_COLOR_RESET);
-    Serial.printf("): State = ");
-    if(rcwl0516MotionState) {
-      Serial.print(FONT_COLOR_STRONG_RED);
-    } else {
-      Serial.print(FONT_COLOR_STRONG_GREEN);
-    }
-    Serial.printf("%s", rcwl0516MotionState ? "ON" : "OFF");
-    Serial.print(STYLE_COLOR_RESET);
-    Serial.printf(" in Endpoint #");
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", RCWL0516_EP);
-    Serial.print(STYLE_COLOR_RESET);
   #endif
-
-  
-  Serial.printf("MQ135 (GPIO=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", MQ135_SENSOR_GPIO);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf("): Analog = ");
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%.2f", mq135Analog);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", CO = ");
-  if(mq135CO2Exceeded1000) {
+  Serial.printf("): State = ");
+  if(pirDeviceMotionState) {
     Serial.print(FONT_COLOR_STRONG_RED);
   } else {
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.print(FONT_COLOR_STRONG_GREEN);
   }
-  Serial.printf("%.2f", mq135GasCO);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", Alcohol = ");
-  if(mq135CO2Exceeded1000) {
-    Serial.print(FONT_COLOR_STRONG_RED);
-  } else {
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-  }
-  Serial.printf("%.2f", mq135GasAlcohol);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", CO2 = ");
-  if(mq135CO2Exceeded1000) {
-    Serial.print(FONT_COLOR_STRONG_RED);
-  } else {
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-  }
-  Serial.printf("%d", (int)mq135GasCO2);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.print(" ppm, Toluen = ");
-  if(mq135CO2Exceeded1000) {
-    Serial.print(FONT_COLOR_STRONG_RED);
-  } else {
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-  }
-  Serial.printf("%.2f", mq135GasToluen);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", NH4 = ");
-  if(mq135CO2Exceeded1000) {
-    Serial.print(FONT_COLOR_STRONG_RED);
-  } else {
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-  }
-  Serial.printf("%.2f", mq135GasNH4);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", Aceton = ");
-  if(mq135CO2Exceeded1000) {
-    Serial.print(FONT_COLOR_STRONG_RED);
-  } else {
-    Serial.print(FONT_COLOR_STRONG_YELLOW);
-  }
-  Serial.printf("%.2f\n", mq135GasAceton);
-  Serial.print(STYLE_COLOR_RESET);
-
-  
-  Serial.printf("HC-SR04 (TRIG=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", HCSR04_TRIGGER_GPIO);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf(", ECHO=");
-  Serial.print(FONT_COLOR_STRONG_CYAN);
-  Serial.printf("%d", HCSR04_ECHO_GPIO);
-  Serial.print(STYLE_COLOR_RESET);
-  Serial.printf("): Distance (cm) = ");
-  Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%.2f", hcsr04DistanceCm);
+  Serial.printf("%s", pirDeviceMotionState ? "ON" : "OFF");
   Serial.print(STYLE_COLOR_RESET);
   Serial.printf(" in Endpoint #");
   Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%d\n", HCSR04_EP);
+  Serial.printf("%d\n", PIR_EP);
   Serial.print(STYLE_COLOR_RESET);
-
+  
+  #if MIKE_BOARD_NUMBER == 2
+    Serial.printf("MQ135 (GPIO=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", MQ135_SENSOR_GPIO);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf("): Analog = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.2f", mq135Analog);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", CO = ");
+    if(mq135CO2Exceeded1000) {
+      Serial.print(FONT_COLOR_STRONG_RED);
+    } else {
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+    }
+    Serial.printf("%.2f", mq135GasCO);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", Alcohol = ");
+    if(mq135CO2Exceeded1000) {
+      Serial.print(FONT_COLOR_STRONG_RED);
+    } else {
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+    }
+    Serial.printf("%.2f", mq135GasAlcohol);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", CO2 = ");
+    if(mq135CO2Exceeded1000) {
+      Serial.print(FONT_COLOR_STRONG_RED);
+    } else {
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+    }
+    Serial.printf("%d", (int)mq135GasCO2);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.print(" ppm, Toluen = ");
+    if(mq135CO2Exceeded1000) {
+      Serial.print(FONT_COLOR_STRONG_RED);
+    } else {
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+    }
+    Serial.printf("%.2f", mq135GasToluen);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", NH4 = ");
+    if(mq135CO2Exceeded1000) {
+      Serial.print(FONT_COLOR_STRONG_RED);
+    } else {
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+    }
+    Serial.printf("%.2f", mq135GasNH4);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", Aceton = ");
+    if(mq135CO2Exceeded1000) {
+      Serial.print(FONT_COLOR_STRONG_RED);
+    } else {
+      Serial.print(FONT_COLOR_STRONG_YELLOW);
+    }
+    Serial.printf("%.2f\n", mq135GasAceton);
+    Serial.print(STYLE_COLOR_RESET);
+    
+    
+    Serial.printf("HC-SR04 (TRIG=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", HCSR04_TRIGGER_GPIO);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(", ECHO=");
+    Serial.print(FONT_COLOR_STRONG_CYAN);
+    Serial.printf("%d", HCSR04_ECHO_GPIO);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf("): Distance (cm) = ");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%.2f", hcsr04DistanceCm);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(" in Endpoint #");
+    Serial.print(FONT_COLOR_STRONG_YELLOW);
+    Serial.printf("%d\n", HCSR04_EP);
+    Serial.print(STYLE_COLOR_RESET);
+  #endif
   //-- empty row between blocks
   Serial.printf("\n");
 }
@@ -877,22 +969,22 @@ void handleClick(void)
   //-- soft reset, ESP will restart!
   esp_restart();
 
-  digitalWrite(CONFIG_BLUE_LIGHT_PIN, true);
+  digitalWrite(BLUE_LED_ONBOARD_PIN, true);
   delay(2000);
-  digitalWrite(CONFIG_BLUE_LIGHT_PIN, false);
+  digitalWrite(BLUE_LED_ONBOARD_PIN, false);
   */
 
   //-- switch to the sesond screen
   if(screenNumber == 1) {
-  	screenNumber = 2;
-  	
-  	Serial.print(FONT_COLOR_STRONG_RED);
+    screenNumber = 2;
+    
+    Serial.print(FONT_COLOR_STRONG_RED);
     Serial.println("Switch to the sesond screen...");
     Serial.print(STYLE_COLOR_RESET);
   } else {
-  	screenNumber = 1;
+    screenNumber = 1;
 
-  	Serial.print(FONT_COLOR_STRONG_GREEN);
+    Serial.print(FONT_COLOR_STRONG_GREEN);
     Serial.println("Switch to default screen...");
     Serial.print(STYLE_COLOR_RESET);
   }
@@ -904,14 +996,14 @@ void reportTask(void *pvParameters)
   while(autoReport)
   {
     //Serial.printf("DS18B20: reportTask\n");
-    //digitalWrite(CONFIG_BLUE_LIGHT_PIN, true);
-    //digitalWrite(CONFIG_ZIGBEE_MODULE_PIN, true);
+    //digitalWrite(BLUE_LED_ONBOARD_PIN, true);
+    //digitalWrite(RED_LED_ONBOARD_PIN, true);
     
     updateAttributes(2);
 
     //vTaskDelay(100 / portTICK_PERIOD_MS);
-    //digitalWrite(CONFIG_BLUE_LIGHT_PIN, false);
-    //digitalWrite(CONFIG_ZIGBEE_MODULE_PIN, false);
+    //digitalWrite(BLUE_LED_ONBOARD_PIN, false);
+    //digitalWrite(RED_LED_ONBOARD_PIN, false);
     vTaskDelay(REPORTING_PERIOD * 1000 / portTICK_PERIOD_MS);
   }
 }
@@ -989,14 +1081,14 @@ void zbhciTask(void *pvParameters)
           //Serial.printf(">> ZBHCI_CMD_ZCL_ONOFF_CMD_RCV\n");
           /*
           if(sHciMsg.uPayload.sZclOnOffCmdRcvPayload.u8CmdId == 0) {
-            digitalWrite(CONFIG_BLUE_LIGHT_PIN, LOW);
+            digitalWrite(BLUE_LED_ONBOARD_PIN, LOW);
             ledState = 0;
           } else if (sHciMsg.uPayload.sZclOnOffCmdRcvPayload.u8CmdId == 1) {
-            digitalWrite(CONFIG_BLUE_LIGHT_PIN, HIGH);
+            digitalWrite(BLUE_LED_ONBOARD_PIN, HIGH);
             ledState = 1;
           } else if (sHciMsg.uPayload.sZclOnOffCmdRcvPayload.u8CmdId == 2) {
             ledState = !ledState;
-            digitalWrite(CONFIG_BLUE_LIGHT_PIN, ledState);
+            digitalWrite(BLUE_LED_ONBOARD_PIN, ledState);
           }
           zbhci_ZclSendReportCmd(0x02, sDstAddr, 1, 1, 0, 1, 0x0006, 0x0000, ZCL_DATA_TYPE_BOOLEAN, 1, &ledState);
           */
@@ -1010,8 +1102,7 @@ void zbhciTask(void *pvParameters)
   }
 }
 
-
-
+#if MIKE_BOARD_NUMBER == 2
 void initMQ135Uni()
 {
   //Init the serial port communication - to debug the library
@@ -1162,8 +1253,10 @@ void getMQ135Uni(void *pvParameters)
       mq135GasCO2 = 20479;
     }
     
-    mq135CO2Exceeded1000 = true;
-    mq135GasCO2 = 1083;
+    if(oledTestScreen) {
+      mq135GasCO2 = 1083;
+      mq135CO2Exceeded1000 = true;
+    }
     
     if(mq135CO2Exceeded1000) {
       mq135GasToluen = checkPPM(44.947, -3.445) * MQ135_ESP32_ADC;
@@ -1209,7 +1302,7 @@ void getMQ135Uni(void *pvParameters)
     delay(5000); //Sampling frequency
   }
 }
-
+#endif
 
 
 
@@ -1230,33 +1323,31 @@ void setup()
   zbhci_Init(msg_queue);
 
   initLEDsOnBoard();
-  initDS18B20();
-  initDS18B20();
   initSSD1306();
-  initBH1750();
-  initBME280();
-  #if USE_FIRST_PIR_SENSOR
-    initPIR_asLib();
+  #if MIKE_BOARD_NUMBER == 1
+    initDS18B20();
+    initBH1750();
+    initBME280();
+    initBME680();
   #endif
-  #if USE_SECOND_PIR_SENSOR
-    initPIR2_asLib();
+  initPIR_asLib();
+  #if MIKE_BOARD_NUMBER == 2
+    initMQ135Uni();
+    initHCSR04();
   #endif
-  //initMQ135Uni();
-  initHCSR04();
 
   xTaskCreatePinnedToCore(zbhciTask, "zbhci", 4096, NULL, 5, NULL, ARDUINO_RUNNING_CORE);
   xTaskCreatePinnedToCore(useSSD1306, "useSSD1306", 4096, NULL, 6, NULL, ARDUINO_RUNNING_CORE);
-  xTaskCreatePinnedToCore(getBH1750, "getBH1750", 4096, NULL, 7, NULL, ARDUINO_RUNNING_CORE);
-  xTaskCreatePinnedToCore(getBME280, "getBME280", 4096, NULL, 8, NULL, ARDUINO_RUNNING_CORE);
-  #if USE_FIRST_PIR_SENSOR
-    xTaskCreatePinnedToCore(getPIR_asLib, "getPIR_asLib", 4096, NULL, 9, NULL, ARDUINO_RUNNING_CORE);
+  #if MIKE_BOARD_NUMBER == 1
+    xTaskCreatePinnedToCore(getBH1750, "getBH1750", 4096, NULL, 7, NULL, ARDUINO_RUNNING_CORE);
+    xTaskCreatePinnedToCore(getBME280, "getBME280", 4096, NULL, 8, NULL, ARDUINO_RUNNING_CORE);
+    xTaskCreatePinnedToCore(getBME680, "getBME680", 4096, NULL, 9, NULL, ARDUINO_RUNNING_CORE);
   #endif
-  #if USE_SECOND_PIR_SENSOR
-    xTaskCreatePinnedToCore(getPIR2_asLib, "getPIR2_asLib", 4096, NULL, 10, NULL, ARDUINO_RUNNING_CORE);
+  xTaskCreatePinnedToCore(getPIR_asLib, "getPIR_asLib", 4096, NULL, 10, NULL, ARDUINO_RUNNING_CORE);
+  #if MIKE_BOARD_NUMBER == 2
+    xTaskCreatePinnedToCore(getMQ135Uni, "getMQ135Uni", 4096, NULL, 11, NULL, ARDUINO_RUNNING_CORE);
+    xTaskCreatePinnedToCore(getHCSR04, "getHCSR04", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
   #endif
-  //xTaskCreatePinnedToCore(getMQ135Uni, "getMQ135Uni", 4096, NULL, 11, NULL, ARDUINO_RUNNING_CORE);
-  xTaskCreatePinnedToCore(getHCSR04, "getHCSR04", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
-  
 
   // zbhci_BdbFactoryReset();
   delay(100);

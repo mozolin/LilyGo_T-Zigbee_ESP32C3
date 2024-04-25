@@ -15,10 +15,10 @@ Before firmware update, adjust the DIP switch:
 1) Install Platformio IDE as VSCode extension (https://platformio.org/install/ide?install=vscode)  
 ![](img/ESP32C3_Flash_01.png)
 
-2) Set correct COM-port for firmware update  
+2) Disable ESP-IDF status bar icons  
 ![](img/ESP32C3_Flash_02.png)
 
-3) Set correct COM-port for serial monitor  
+3) Set the correct COM-port for upload and serial monitor  
 ![](img/ESP32C3_Flash_03.png)
 
 4) Build and upload firmware  

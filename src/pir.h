@@ -17,7 +17,7 @@ boolean pir_startTimer = false;
 boolean pir_motion = false;
 
 //-- LIBRARY
-RCWL0516 pir(HCSR501_SENSOR_GPIO);
+RCWL0516 pir(PIR_SENSOR_GPIO);
 unsigned long
   pirNow = millis(),
   pirLastTrgTime = 0;
@@ -35,7 +35,7 @@ bool
 void initPIR_asDirect()
 {
   pinMode(PIR_SENSOR_LED_GPIO, OUTPUT);      // initalize LED as an output
-  pinMode(RCWL0516_SENSOR_GPIO, INPUT);
+  pinMode(PIR_SENSOR_GPIO, INPUT);
 }
 bool getPIRState_asDirect()
 {
@@ -59,7 +59,7 @@ void getPIR_asDirect(void *pvParameters)
 {
   while(1)
   {
-    pir_val = digitalRead(RCWL0516_SENSOR_GPIO);   // read sensor value
+    pir_val = digitalRead(PIR_SENSOR_GPIO);   // read sensor value
     if(pir_val == HIGH) {           // check if the sensor is HIGH
       digitalWrite(PIR_SENSOR_LED_GPIO, HIGH);   // turn LED ON
       if(pir_state == LOW) {
@@ -113,7 +113,7 @@ void initPIR_asTimer()
 {
   //-- PIR Motion Sensor mode INPUT_PULLUP
   pinMode(SOME_PIR_SENSOR_GPIO, INPUT_PULLUP);
-  //-- Set HCSR501_SENSOR_GPIO pin as interrupt, assign interrupt function and set RISING mode
+  //-- Set PIR_SENSOR_GPIO pin as interrupt, assign interrupt function and set RISING mode
   attachInterrupt(digitalPinToInterrupt(SOME_PIR_SENSOR_GPIO), detectsMovement_asTimer, RISING);
   //-- Set LED to LOW
   pinMode(PIR_SENSOR_LED_GPIO, OUTPUT);
@@ -158,7 +158,9 @@ void initPIR_asLib()
 {
   pir.activate();
   pirNow = millis();
-  pinMode(PIR_SENSOR_LED_GPIO, OUTPUT);      // initalize LED as an output
+  #if MIKE_BOARD_NUMBER == 1
+    pinMode(PIR_SENSOR_LED_GPIO, OUTPUT);      // initalize LED as an output
+  #endif
 }
 bool getPIRState_asLib()
 {
@@ -231,8 +233,10 @@ void getPIR_asLib(void *pvParameters)
       Serial.print(STYLE_COLOR_RESET);
       */
       pirLastMotionState = pirMotionState;
-
-      digitalWrite(PIR_SENSOR_LED_GPIO, HIGH);
+      
+      #if MIKE_BOARD_NUMBER == 1
+        digitalWrite(PIR_SENSOR_LED_GPIO, HIGH);
+      #endif
       //Serial.printf("LED on %d: %d\n", PIR_SENSOR_LED_GPIO, HIGH);
     //-- state has been change from 1 to 0
     } else if(pirLastMotionState == true && pirMotionState == false) {
@@ -243,7 +247,9 @@ void getPIR_asLib(void *pvParameters)
       */
       pirLastMotionState = pirMotionState;
 
-      digitalWrite(PIR_SENSOR_LED_GPIO, LOW);
+      #if MIKE_BOARD_NUMBER == 1
+        digitalWrite(PIR_SENSOR_LED_GPIO, LOW);
+      #endif
       //Serial.printf("LED on %d: %d\n", PIR_SENSOR_LED_GPIO, LOW);
     }
 
