@@ -807,7 +807,7 @@ void updateAttributes(int flag)
   	Serial.print(STYLE_COLOR_RESET);
   	Serial.printf(" m in Endpoint #");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", BME280_BH1750_EP);
+    Serial.printf("%d\n", BME680_EP);
     Serial.print(STYLE_COLOR_RESET);
     
     Serial.printf("BH1750 (SDA=");
