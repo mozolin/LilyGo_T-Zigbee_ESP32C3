@@ -25,6 +25,8 @@
 #include "images/zigbee_disconnected.h"
 #include "images/zigbee_image.h"
 
+
+
 #if MIKE_BOARD_NUMBER == 1
 //-- GPIO where the DS18B20 is connected to
 const int oneWireBus = ONE_WIRE_BUS_GPIO;
@@ -99,10 +101,28 @@ float
 bool BME680Inited = false;
 Adafruit_BME680 bme680;
 
-//-- param #1: Input pin for the button
-//-- param #2: Button is active LOW
-//-- param #3: Enable internal pull-up resistor
-OneButton btn = OneButton(EXTERNAL_BUTTON_GPIO, true, true); 
+//-- network info
+te_HCIMsgType payloadCmdState;
+uint16_t payloadNwkAddr = 0;
+uint64_t payloadIeeeAddr = 0;
+uint16_t payloadPanId = 0;
+uint64_t payloadExtPanId = 0;
+uint8_t  payloadChannel = 0;
+
+OneButton btn = OneButton(EXTERNAL_BUTTON_GPIO, true, true);
+
+void drawSSD1306Header()
+{
+  char temp_data_str[100] = {0};
+    
+  oled.setCursorXY(0, 0);
+  sprintf(temp_data_str, "Board #%d", MIKE_BOARD_NUMBER);
+  oled.print(temp_data_str);
+
+  oled.setCursorXY(0, 8);
+  sprintf(temp_data_str, "Screen #%d", screenNumber);
+  oled.print(temp_data_str);
+}
 
 void drawSSD1306()
 {
@@ -118,11 +138,14 @@ void drawSSD1306()
   int16_t t = 0, X = 0, Y = 0;
   
   char temp_data_str[100] = {0};
-    
+
+  drawSSD1306Header();
+  /*
   X = 0; Y = 0;
   oled.setCursorXY(X, Y);
   sprintf(temp_data_str, "Board #%d", MIKE_BOARD_NUMBER);
-  oled.print(temp_data_str);  
+  oled.print(temp_data_str);
+  */
   
   #if MIKE_BOARD_NUMBER == 2
     //-- MQ135 gas sensor
@@ -178,11 +201,11 @@ void drawSSD1306()
       idx++;
     }
  
-   	//-- BH1750 illuminance sensor
+     //-- BH1750 illuminance sensor
     oled.rect(0, 32, 127, 39, OLED_CLEAR);
     oled.setCursorXY(0, 32);
-		sprintf(temp_data_str, "I=%.2f", bh1750Illum);
-		oled.print(temp_data_str);
+    sprintf(temp_data_str, "I=%.2f", bh1750Illum);
+    oled.print(temp_data_str);
 
     //-- BME280 sensor
     oled.rect(0, 40, 127, 47, OLED_CLEAR);
@@ -191,16 +214,16 @@ void drawSSD1306()
     oled.print(temp_data_str);
     
     //-- BME680 sensor
-  	oled.rect(0, 48, 127, 55, OLED_CLEAR);
-  	oled.setCursorXY(0, 48);
-  	sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", bme680Temp, bme680Humid, bme680Pres);
-  	oled.print(temp_data_str);
+    oled.rect(0, 48, 127, 55, OLED_CLEAR);
+    oled.setCursorXY(0, 48);
+    sprintf(temp_data_str, "%.2f, %.2f%%, %.0f", bme680Temp, bme680Humid, bme680Pres);
+    oled.print(temp_data_str);
 
-  	//-- BME680: gas & altitude in the last row
-  	oled.rect(0, 56, 127, 63, OLED_CLEAR);
+    //-- BME680: gas & altitude in the last row
+    oled.rect(0, 56, 127, 63, OLED_CLEAR);
     oled.setCursorXY(0, 56);
-   	sprintf(temp_data_str, "%.2fkOm, %.2fm", bme680Gas, bme680Alt);
-  	oled.print(temp_data_str);
+    sprintf(temp_data_str, "%.2fkOm, %.2fm", bme680Gas, bme680Alt);
+    oled.print(temp_data_str);
   #endif
   //-- draw icons in the header
   if(pirDeviceMotionState) {
@@ -239,10 +262,7 @@ void drawSSD1306_02()
   int16_t X = 0, Y = 0;
   char temp_data_str[100] = {0};
 
-  X = 0; Y = 0;
-  oled.setCursorXY(X, Y);
-  sprintf(temp_data_str, "Board #%d", MIKE_BOARD_NUMBER);
-  oled.print(temp_data_str);  
+  drawSSD1306Header();
 
   #if MIKE_BOARD_NUMBER == 1
     X = 0; Y = 16;
@@ -289,13 +309,61 @@ void drawSSD1306_02()
   #endif
 
   oled.update();
+}
 
-  delay(10000);
-  screenNumber = 1;
-  Serial.print(FONT_COLOR_STRONG_GREEN);
-  Serial.println("Switch to default screen...");
-  Serial.print(STYLE_COLOR_RESET);
+//-- zb_state: 0 - ZB info only, 1 - joining ZB, 2 - leaving ZB
+void drawSSD1306_03(int zb_state)
+{
+  char temp_data_str[100] = {0};
+
+  time_t t = time(NULL);
+  struct tm tm = *localtime(&t);
+
   oled.clear();
+  //oled.rect(94, 0, 108, 15, OLED_CLEAR);
+  drawSSD1306Header();
+
+  //oled.setCursorXY(0, 16);
+  //sprintf(temp_data_str, "State = %d", zb_state);
+  //oled.print(temp_data_str);
+  
+  oled.setCursorXY(0, 16);
+  if(zb_state == 1) {
+    //-- 1 - joining ZB
+    sprintf(temp_data_str, "Join ZB network");
+    oled.print(temp_data_str);
+  } else if(zb_state == 2) {
+    //-- 2 - leaving ZB
+    sprintf(temp_data_str, "Leave ZB network");
+    oled.print(temp_data_str);
+  } else {
+    //-- 0 - ZB info only
+    //sprintf(temp_data_str, "now: %d-%02d-%02d %02d:%02d:%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    //oled.print(temp_data_str);
+
+    oled.setCursorXY(0, 24);
+    sprintf(temp_data_str, "Nwk %#04x", payloadNwkAddr);
+    oled.print(temp_data_str);
+    
+    oled.setCursorXY(0, 32);
+    sprintf(temp_data_str, "%#016llx", payloadIeeeAddr);
+    oled.print(temp_data_str);
+    
+    oled.setCursorXY(0, 40);
+    sprintf(temp_data_str, "Pan 0x%04hx", payloadPanId);
+    oled.print(temp_data_str);
+    
+    oled.setCursorXY(0, 48);
+    sprintf(temp_data_str, "Ext %#016llx", payloadExtPanId);
+    oled.print(temp_data_str);
+    
+    oled.setCursorXY(0, 56);
+    sprintf(temp_data_str, "Channel %d\n", (int)payloadChannel);
+    oled.print(temp_data_str);
+  }
+  
+
+  oled.update();
 }
 
 void initLEDsOnBoard()
@@ -317,14 +385,15 @@ void initSSD1306()
   Wire.setClock(ESP32_I2C_CLOCK_SPEED);
   //Serial.printf("SSD #3\n");
   
-  //-- logo at start
+  //-- Zigbee logo at start
   oled.clear();
   oled.drawBitmap(0, 0, zigbee_logo, 128, 64);
   oled.update();
   delay(5000);
+  oled.clear();
  
   //-- icons
-  oled.clear();
+  //oled.clear();
   //ssd1306_draw_bitmap(ssd1306_dev, 112, 48, zigbee_image, 16, 16);
   //ssd1306_draw_bitmap(ssd1306_dev, 112, 0, zigbee_connected, 16, 16);
   //ssd1306_draw_bitmap(ssd1306_dev, 112, 0, zigbee_disconnected, 16, 16);
@@ -429,13 +498,13 @@ void getBME680(void *pvParameters)
   {
     if(BME680Inited) {
       if(!bme680.performReading()) {
-				Serial.println("Failed to perform reading BME680!");
+        Serial.println("Failed to perform reading BME680!");
       } else {
-      	bme680Humid = bme680.humidity;
-  			bme680Pres  = bme680.pressure / 100.0;
-  			bme680Temp  = bme680.temperature;
-  			bme680Gas   = bme680.gas_resistance / 1000.0;
-  			bme680Alt   = bme680.readAltitude(BME680_SEA_LEVEL_PRESSURE);
+        bme680Humid = bme680.humidity;
+        bme680Pres  = bme680.pressure / 100.0;
+        bme680Temp  = bme680.temperature;
+        bme680Gas   = bme680.gas_resistance / 1000.0;
+        bme680Alt   = bme680.readAltitude(BME680_SEA_LEVEL_PRESSURE);
       }
     }
     delay(5000);
@@ -473,16 +542,32 @@ void getHCSR04(void *pvParameters)
 }
 #endif
 
+void setBtnTick(void *pvParameters)
+{
+  while(1) {
+    btn.tick();
+    delay(500);
+  }
+}
+
+
 void useSSD1306(void *pvParameters)
 {
   while(1)
   {
-    if(screenNumber == 2) {
-      //-- switch to the second screen
-      drawSSD1306_02();
-    } else {
-      //-- switch to default screen
-      drawSSD1306();
+    switch(screenNumber) {
+      case 1:
+        drawSSD1306();
+        break;
+      case 2:
+        drawSSD1306_02();
+        break;
+      case 3:
+        drawSSD1306_03(0);
+        break;
+      default:
+        drawSSD1306();
+        break;
     }
     delay(5000);
     
@@ -644,6 +729,8 @@ void updateAttributes(int flag)
   //-- int type: 1 = Blue, 2 = Red
   BlinkLedOnBoard(1);
 
+  showNetworkInfo();
+
   #if MIKE_BOARD_NUMBER == 1
     ds18b20.requestTemperatures();
     //uint8_t d = ds18b20.getDeviceCount();
@@ -803,9 +890,9 @@ void updateAttributes(int flag)
     //Serial.printf(" KOhms, Altitude = ");
     Serial.printf(" KΩ, Altitude = ");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-  	Serial.printf("%.2f", bme680Alt);
-  	Serial.print(STYLE_COLOR_RESET);
-  	Serial.printf(" m in Endpoint #");
+    Serial.printf("%.2f", bme680Alt);
+    Serial.print(STYLE_COLOR_RESET);
+    Serial.printf(" m in Endpoint #");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
     Serial.printf("%d\n", BME680_EP);
     Serial.print(STYLE_COLOR_RESET);
@@ -947,48 +1034,19 @@ void getData()
 }
 
 
-//-- Single click: update attributes
+//-- Single click: switch OLED screens
 void handleClick(void)
 {
-  /*
-  if(netState == 1) {
-    getData();
-    delay(100);
-  } else {
-    Serial.print(FONT_COLOR_STRONG_RED);
-    Serial.println("Not joined the zigbee network");
-    Serial.print(STYLE_COLOR_RESET);
-  }
-  */
-  /*
-  Serial.print(FONT_COLOR_STRONG_RED);
-  Serial.printf("Soft reset pressed: %s will restart!\n", CHIP_NAME);
-  Serial.print(STYLE_COLOR_RESET);
-  delay(1000);
-  
-  //-- soft reset, ESP will restart!
-  esp_restart();
-
-  digitalWrite(BLUE_LED_ONBOARD_PIN, true);
-  delay(2000);
-  digitalWrite(BLUE_LED_ONBOARD_PIN, false);
-  */
-
-  //-- switch to the sesond screen
-  if(screenNumber == 1) {
-    screenNumber = 2;
-    
-    Serial.print(FONT_COLOR_STRONG_RED);
-    Serial.println("Switch to the sesond screen...");
-    Serial.print(STYLE_COLOR_RESET);
-  } else {
+  screenNumber++;
+  if(screenNumber > 3) {
     screenNumber = 1;
-
-    Serial.print(FONT_COLOR_STRONG_GREEN);
-    Serial.println("Switch to default screen...");
-    Serial.print(STYLE_COLOR_RESET);
   }
+  //-- clear screen before switching to another one
   oled.clear();
+  
+  Serial.print(FONT_COLOR_STRONG_RED);
+  Serial.printf("Single click! Switch to the screen #%d...\n", screenNumber);
+  Serial.print(STYLE_COLOR_RESET);
 }
 
 void reportTask(void *pvParameters)
@@ -1029,6 +1087,7 @@ void handleDoubleClick(void)
 //-- Long click: join/leave the zigbee network
 void handleLongPress()
 {
+  int zb_state = 0;
   Serial.printf("handleLongPress: netState=%d\n", netState);
   if(netState == 0) {
     Serial.print(FONT_COLOR_STRONG_YELLOW);
@@ -1036,26 +1095,73 @@ void handleLongPress()
     Serial.print(STYLE_COLOR_RESET);
     zbhci_BdbCommissionSteer();
     vTaskDelay(100 / portTICK_PERIOD_MS);
-  } else if (netState == 1) {
+    zb_state = 1;
+  } else if(netState == 1) {
     Serial.print(FONT_COLOR_STRONG_RED);
-    Serial.println("Leave the zigbee network");
+    Serial.println("Leaving the zigbee network");
     Serial.print(STYLE_COLOR_RESET);
     zbhci_BdbFactoryReset();
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     netState = 0;
+    zb_state = 2;
   }
+  
+  //-- zb_state: 0 - ZB info only, 1 - joining ZB, 2 - leaving ZB
+  screenNumber = 3;
+  drawSSD1306_03(zb_state);
 }
 
+void setNetworkInfo(ts_MsgNetworkStateRspPayload *psPayload)
+{
+  payloadCmdState = ZBHCI_CMD_NETWORK_STATE_RSP;
+  payloadNwkAddr  = psPayload->u16NwkAddr;
+	payloadIeeeAddr = psPayload->u64IeeeAddr;
+	payloadPanId    = psPayload->u16PanId;
+	payloadExtPanId = psPayload->u64extPanId;
+	payloadChannel  = psPayload->u8Channel;
+}
+void showNetworkInfo()
+{
+  Serial.printf("Cmd: ");
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%#04x", payloadCmdState);
+  Serial.print(STYLE_COLOR_RESET);
+  Serial.printf(", Nwk: ");
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%#04x", payloadNwkAddr);
+  Serial.print(STYLE_COLOR_RESET);
+  Serial.printf(", IEEE: ");
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%#016llx", payloadIeeeAddr);
+  Serial.print(STYLE_COLOR_RESET);
+  Serial.printf(", PanId: ");
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("0x%04hx", payloadPanId);
+  Serial.print(STYLE_COLOR_RESET);
+  Serial.printf(", ExtPanId: ");
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%#016llx", payloadExtPanId);
+  Serial.print(STYLE_COLOR_RESET);
+  Serial.printf(", Channel: ");
+  Serial.print(FONT_COLOR_STRONG_YELLOW);
+  Serial.printf("%#02x (%d)\n", payloadChannel, (int)payloadChannel);
+  Serial.print(STYLE_COLOR_RESET);
+}
 
 void zbhciTask(void *pvParameters)
 {
   ts_HciMsg sHciMsg;
+  ts_MsgNetworkStateRspPayload psPayload;
 
   while(1)
   {
     bzero(&sHciMsg, sizeof(sHciMsg));
     if(xQueueReceive(msg_queue, &sHciMsg, portMAX_DELAY))
     {
+      
+      psPayload = sHciMsg.uPayload.sNetworkStateRspPayloasd;
+      setNetworkInfo(&psPayload);
+
       switch(sHciMsg.u16MsgType)
       {
         case ZBHCI_CMD_ACKNOWLEDGE:
@@ -1064,11 +1170,11 @@ void zbhciTask(void *pvParameters)
           break;
         case ZBHCI_CMD_NETWORK_STATE_RSP:
           //Serial.printf(">> ZBHCI_CMD_NETWORK_STATE_RSP\n");
-          if(sHciMsg.uPayload.sNetworkStateRspPayloasd.u16NwkAddr == 0x0000) {
+          if(psPayload.u16NwkAddr == 0x0000) {
             zbhci_BdbFactoryReset();
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             zbhci_NetworkStateReq();
-          } else if (sHciMsg.uPayload.sNetworkStateRspPayloasd.u16NwkAddr != 0xFFFF) {
+          } else if(psPayload.u16NwkAddr != 0xFFFF) {
             netState = 1;
           }
           break;
@@ -1348,6 +1454,7 @@ void setup()
     xTaskCreatePinnedToCore(getMQ135Uni, "getMQ135Uni", 4096, NULL, 11, NULL, ARDUINO_RUNNING_CORE);
     xTaskCreatePinnedToCore(getHCSR04, "getHCSR04", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
   #endif
+  xTaskCreatePinnedToCore(setBtnTick, "setBtnTick", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
 
   // zbhci_BdbFactoryReset();
   delay(100);

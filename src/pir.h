@@ -11,7 +11,8 @@ int
 //-- !!! TIMER (may fire an error) !!!
 #define pir_timeSeconds 10
 //-- Timer: Auxiliary variables
-unsigned long pir_now = millis();
+//unsigned long pir_now = millis();
+int pir_now = millis();
 unsigned long pir_lastTrigger = 0;
 boolean pir_startTimer = false;
 boolean pir_motion = false;
