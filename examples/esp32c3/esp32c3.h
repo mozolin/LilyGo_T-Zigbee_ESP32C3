@@ -3,7 +3,7 @@
 #include "zb_clusters.h"
 
 
-#define MIKE_BOARD_NUMBER              1
+#define MIKE_BOARD_NUMBER              2
 
 //— list of pins available on the ESP32-C3 + TLSR8258 board (aka LILYGO® T-Zigbee)
 #define ESP32C3_GPIO_01                1 //-> MQ135_SENSOR_GPIO
@@ -52,6 +52,7 @@
 
 
 #define ZCL_MEASURED_VALUE_ATTR_ID     0x0000
+#define ZCL_PRESENT_VALUE_ATTR_ID      0x0055
 //-- 0x02 – with destination short address and endpoint
 #define ZCL_CMD_DST_ADDR_MODE          0x02
 //-- Direction of the command: 0 – Client to server, 1 – Server to client.

@@ -10,7 +10,7 @@ extern "C" {
 /***        include files                                                   ***/
 /******************************************************************************/
 
-#include "zbhci_commom.h"
+#include "zbhci_common.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"

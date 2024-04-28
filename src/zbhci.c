@@ -13,6 +13,10 @@
 #include <string.h>
 #include <stdbool.h>
 
+
+#include "colors.h"
+
+
 /******************************************************************************/
 /***        macro definitions                                               ***/
 /******************************************************************************/
@@ -2037,6 +2041,15 @@ static int32_t zbhci_CmdUnpack(uint8_t data, uint16_t *pu16Type, uint16_t *pu16L
 static void zbhciCmdHandler(uint16_t u16MsgType, uint16_t u16MsgLen, uint8_t *pu8Payload, void *psPayload)
 {
     if (!pu8Payload || !psPayload) return ;
+
+    /*
+    if(u16MsgType != 0x8000) {
+    	printf(FONT_COLOR_STRONG_BLUE);
+  		printf("MSG TYPE: %#04x", u16MsgType);
+  		printf(STYLE_COLOR_RESET);
+  		printf("\n");
+  	}
+  	*/
 
     switch (u16MsgType)
     {

@@ -97,7 +97,8 @@ float
   bme680Pres = 0,
   bme680Temp = 0,
   bme680Gas = 0,
-  bme680Alt = 0;
+  bme680Alt = 0,
+  gasVolume = 400.0;
 bool BME680Inited = false;
 Adafruit_BME680 bme680;
 
@@ -151,15 +152,16 @@ void drawSSD1306()
     //-- MQ135 gas sensor
     //-- the first row on yellow
     oled.home();
-    oled.rect(0, 0, 77, 7, OLED_CLEAR);
-    sprintf(temp_data_str, "CO2=%d", (int)mq135GasCO2);
+    //oled.rect(0, 0, 77, 7, OLED_CLEAR);
+    oled.setCursorXY(0, 16);
+    sprintf(temp_data_str, "CO2: %d ppm", (int)mq135GasCO2);
     oled.print(temp_data_str);
   
     //-- HC-SR04 distance sensor
     //-- the second row on yellow
-    oled.rect(0, 8, 77, 15, OLED_CLEAR);
-    oled.setCursorXY(0, 8);
-    sprintf(temp_data_str, "D=%.2f", hcsr04DistanceCm);
+    //oled.rect(0, 8, 77, 15, OLED_CLEAR);
+    oled.setCursorXY(0, 24);
+    sprintf(temp_data_str, "D: %.2f cm", hcsr04DistanceCm);
     oled.print(temp_data_str);
   #endif
 
@@ -247,7 +249,7 @@ void drawSSD1306()
       */
     } else {
       //-- clear header row: from 0 to the end of "danger_image" icon
-      oled.rect(78, 0, 88, 15, OLED_CLEAR);
+      oled.rect(78, 0, 94, 15, OLED_CLEAR);
     }
   #endif
   //-- redraw Zigbee icons
@@ -695,7 +697,13 @@ void printAddress(DeviceAddress deviceAddress)
 }
 #endif
 
-void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data)
+//----------------------------------------------------------------------//
+// u8SrcEp      - source endpoint                                       //
+// u16ClusterID - cluster ID                                            //
+// pu8Data      - attribute value                                       //
+// u16AttrID    - attribute ID, default: ZCL_MEASURED_VALUE_ATTR_ID (0) //
+//----------------------------------------------------------------------//
+void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data, uint16_t u16AttrID = ZCL_MEASURED_VALUE_ATTR_ID)
 {
   //-- void zbhci_ZclSendReportCmd()
   zbhci_ZclSendReportCmd(
@@ -706,7 +714,7 @@ void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data)
     ZCL_CMD_DISABLE_DEFAULT_RSP, //-- uint8_t u8DisableDefaultRsp
     ZCL_CMD_DIRECTION,           //-- uint8_t u8Direction
     u16ClusterID,                //-- uint16_t u16ClusterID
-    ZCL_MEASURED_VALUE_ATTR_ID,  //-- uint16_t u16AttrID
+    u16AttrID,                   //-- uint16_t u16AttrID
     ZCL_DATA_TYPE_DATA16,        //-- uint8_t u8DataType
     ZCL_CMD_DATA_LENGTH,         //-- uint8_t u8DataLen
     pu8Data                      //-- uint8_t *pu8Data
@@ -714,33 +722,15 @@ void zb_sendReport(uint8_t u8SrcEp, uint16_t u16ClusterID, uint8_t *pu8Data)
   vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
-float gasVolume = 400.0;
-
-void updateAttributes(int flag)
+void printSensorsInfo()
 {
-  /*
-  if(flag == 1) {
-    Serial.printf("DS18B20: updating (getData)...\n");
-  }
-  if(flag == 2) {
-    Serial.printf("DS18B20: updating (reportTask)...\n");
-  }
-  */
-  //-- int type: 1 = Blue, 2 = Red
-  BlinkLedOnBoard(1);
-
-  showNetworkInfo();
-
   #if MIKE_BOARD_NUMBER == 1
-    ds18b20.requestTemperatures();
-    //uint8_t d = ds18b20.getDeviceCount();
-    //Serial.printf("TOTAL DEVICES: %d\n", d);
-    numDevices = ds18b20.getDS18Count();
-    
+    //-------------//
+    //   DS18B20   //
+    //-------------//
+  	numDevices = ds18b20.getDS18Count();
     int16_t t = 0;
     int srcEpNum = 0;
-    int dstEpNum = 1;
-    
     for(int i = 0; i < numDevices; ++i) {
       t = ds18b20.getTempCByIndex(i) * 100;
       srcEpNum = i + 1;
@@ -787,57 +777,11 @@ void updateAttributes(int flag)
       */
     
       Serial.print("\n");
-      
-      //-- DS18B20 Temperature Sensor
-      zb_sendReport(srcEpNum, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&t);
     }
-    
-    //-- BME280 Temperature Sensor
-    int16_t tmpTemp = bme280Temp * 100;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
-    
-    //-- BME280 Humidity Sensor
-    int16_t tmpHumid = bme280Humid * 100;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
-    
-    //-- BME280 Pressure Sensor
-    int16_t tmpPres = bme280Pres * 1;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
-    
-    
-    //-- BME680 Temperature Sensor
-    int16_t tmpTemp2 = bme680Temp * 100;
-    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp2);
-    
-    //-- BME680 Humidity Sensor
-    int16_t tmpHumid2 = bme680Humid * 100;
-    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid2);
-    
-    //-- BME680 Pressure Sensor
-    int16_t tmpPres2 = bme680Pres * 1;
-    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres2);
- 
-    //-- BH1750 Illuminance Sensor
-    //-- the real "lux" value is multiplied by 100 for correct conversion in the external Zigbee2MQTT converter
-    //-- loot at MIKE.ESP32-C3.js: MIKE => just fixed output format: "XXX" => "(XXX / 100).toFixed(2)"
-    int16_t tmpIllum = bh1750Illum * 100;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
-  #endif
 
-  //-- PIR Occupancy Sensor
-  pirDeviceMotionState = getPIRState_asLib();
-  int16_t tmpOccup = pirDeviceMotionState * 1;
-  zb_sendReport(PIR_EP, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup);
-
-  #if MIKE_BOARD_NUMBER == 2
-    if(mq135Inited) {
-       //-- MQ135 Gas Sensor
-      int16_t tmpPPM = (int)mq135GasCO2;
-      zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpPPM);
-    }
-  #endif
-
-  #if MIKE_BOARD_NUMBER == 1
+    //------------//
+    //   BME280   //
+    //------------//
     Serial.printf("BME280 (SDA=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
     Serial.printf("%d", ESP32_SDA_PIN);
@@ -863,6 +807,10 @@ void updateAttributes(int flag)
     Serial.printf("%d\n", BME280_BH1750_EP);
     Serial.print(STYLE_COLOR_RESET);
     
+    
+    //------------//
+    //   BME680   //
+    //------------//
     Serial.printf("BME680 (SDA=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
     Serial.printf("%d", ESP32_SDA_PIN);
@@ -887,7 +835,6 @@ void updateAttributes(int flag)
     Serial.print(FONT_COLOR_STRONG_YELLOW);
     Serial.printf("%.2f", bme680Gas);
     Serial.print(STYLE_COLOR_RESET);
-    //Serial.printf(" KOhms, Altitude = ");
     Serial.printf(" KΩ, Altitude = ");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
     Serial.printf("%.2f", bme680Alt);
@@ -897,6 +844,10 @@ void updateAttributes(int flag)
     Serial.printf("%d\n", BME680_EP);
     Serial.print(STYLE_COLOR_RESET);
     
+    
+    //------------//
+    //   BH1750   //
+    //------------//
     Serial.printf("BH1750 (SDA=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
     Serial.printf("%d", ESP32_SDA_PIN);
@@ -916,8 +867,14 @@ void updateAttributes(int flag)
   #endif
 
   #if MIKE_BOARD_NUMBER == 1
+    //--------------//
+    //   HC-SR501   //
+    //--------------//
     Serial.printf("HC-SR501 (GPIO=");
   #else
+    //---------------//
+    //   RCWL-0516   //
+    //---------------//
     Serial.printf("RCWL-0516 (GPIO=");
   #endif
   Serial.print(FONT_COLOR_STRONG_CYAN);
@@ -943,6 +900,9 @@ void updateAttributes(int flag)
   Serial.print(STYLE_COLOR_RESET);
   
   #if MIKE_BOARD_NUMBER == 2
+    //-----------//
+    //   MQ135   //
+    //-----------//
     Serial.printf("MQ135 (GPIO=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
     Serial.printf("%d", MQ135_SENSOR_GPIO);
@@ -1001,6 +961,9 @@ void updateAttributes(int flag)
     Serial.print(STYLE_COLOR_RESET);
     
     
+    //-------------//
+    //   HC-SR04   //
+    //-------------//
     Serial.printf("HC-SR04 (TRIG=");
     Serial.print(FONT_COLOR_STRONG_CYAN);
     Serial.printf("%d", HCSR04_TRIGGER_GPIO);
@@ -1021,6 +984,96 @@ void updateAttributes(int flag)
   //-- empty row between blocks
   Serial.printf("\n");
 }
+
+void updateAttributes(int flag)
+{
+  /*
+  if(flag == 1) {
+    Serial.printf("DS18B20: updating (getData)...\n");
+  }
+  if(flag == 2) {
+    Serial.printf("DS18B20: updating (reportTask)...\n");
+  }
+  */
+  //-- int type: 1 = Blue, 2 = Red
+  BlinkLedOnBoard(1);
+
+  showNetworkInfo();
+
+  #if MIKE_BOARD_NUMBER == 1
+    ds18b20.requestTemperatures();
+    //uint8_t d = ds18b20.getDeviceCount();
+    //Serial.printf("TOTAL DEVICES: %d\n", d);
+    numDevices = ds18b20.getDS18Count();
+    
+    int16_t t = 0;
+    int srcEpNum = 0;
+    int dstEpNum = 1;
+    
+    for(int i = 0; i < numDevices; ++i) {
+      t = ds18b20.getTempCByIndex(i) * 100;
+      srcEpNum = i + 1;
+      //-- DS18B20 Temperature Sensor
+      zb_sendReport(srcEpNum, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&t);
+    }
+    
+    //-- BME280 Temperature Sensor
+    int16_t tmpTemp = bme280Temp * 100;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
+    
+    //-- BME280 Humidity Sensor
+    int16_t tmpHumid = bme280Humid * 100;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
+    
+    //-- BME280 Pressure Sensor
+    int16_t tmpPres = bme280Pres * 1;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
+    
+    
+    //-- BME680 Temperature Sensor
+    int16_t tmpTemp2 = bme680Temp * 100;
+    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp2);
+    
+    //-- BME680 Humidity Sensor
+    int16_t tmpHumid2 = bme680Humid * 100;
+    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid2);
+    
+    //-- BME680 Pressure Sensor
+    int16_t tmpPres2 = bme680Pres * 1;
+    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres2);
+ 
+    //-- BME680 Gas Resistance Sensor
+    int16_t tmpGas2 = bme680Gas * 100;
+    zb_sendReport(1, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGas2, ZCL_PRESENT_VALUE_ATTR_ID);
+ 
+    //-- BME680 Altitude Sensor
+    int16_t tmpAlt2 = bme680Alt * 100;
+    zb_sendReport(2, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpAlt2, ZCL_PRESENT_VALUE_ATTR_ID);
+ 
+    //-- BH1750 Illuminance Sensor
+    //-- the real "lux" value is multiplied by 100 for correct conversion in the external Zigbee2MQTT converter
+    //-- loot at MIKE.ESP32-C3.js: MIKE => just fixed output format: "XXX" => "(XXX / 100).toFixed(2)"
+    int16_t tmpIllum = bh1750Illum * 100;
+    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
+  #endif
+
+  //-- PIR Occupancy Sensor
+  pirDeviceMotionState = getPIRState_asLib();
+  int16_t tmpOccup = pirDeviceMotionState * 1;
+  zb_sendReport(PIR_EP, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup);
+
+  #if MIKE_BOARD_NUMBER == 2
+    if(mq135Inited) {
+       //-- MQ135 Gas Sensor
+      int16_t tmpPPM = (int)mq135GasCO2;
+      zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpPPM);
+    }
+  #endif
+
+  printSensorsInfo();
+
+}
+
 
 void getData()
 {
@@ -1148,22 +1201,78 @@ void showNetworkInfo()
   Serial.print(STYLE_COLOR_RESET);
 }
 
+void appHandleZCLReadResponse(ts_MsgZclAttrReadRspPayload *payload)
+{
+  uint16_t u16AttrID;
+  /*
+  DeviceNode *device = NULL;
+  device = findDeviceByNwkaddr(payload->u16SrcAddr);
+  if(device == NULL) {
+    return ;
+  }
+  */
+  
+  Serial.printf("CLUSTER ID: %d\n", payload->u16ClusterId);
+
+  switch(payload->u16ClusterId) {
+    case ZCL_CLUSTER_GEN_TIME: /* Time Cluster */
+      for(size_t i = 0; i < payload->u8AttrNum; i++) {
+      	u16AttrID = payload->asAttrReadList[i].u16AttrID;
+
+      	Serial.printf("ATTR ID: %d\n", u16AttrID);
+
+        if(u16AttrID == 0x0005) {
+          /*
+          memcpy(
+            device->au8ModelId,
+            payload->asAttrReadList[i].uAttrData.au8AttrData,
+            payload->asAttrReadList[i].u16DataLen
+          );
+          */
+
+          //Serial.printf("ATTR: %s\n", payload->asAttrReadList[i].uAttrData.au8AttrData);
+
+          /*
+          if(!strncmp((const char *)payload->asAttrReadList[i].uAttrData.au8AttrData,
+            "lumi.sensor_motion.aq2",
+            strlen("lumi.sensor_motion.aq2"))) {
+              appDataBaseSave();
+              rtcgq11lmAdd(device->u64IeeeAddr);
+          }
+          */
+        }
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 void zbhciTask(void *pvParameters)
 {
   ts_HciMsg sHciMsg;
   ts_MsgNetworkStateRspPayload psPayload;
+  
+  uint16_t msgType;
 
-  while(1)
-  {
+  while(1) {
+    
     bzero(&sHciMsg, sizeof(sHciMsg));
-    if(xQueueReceive(msg_queue, &sHciMsg, portMAX_DELAY))
-    {
-      
+
+    msgType = sHciMsg.u16MsgType;
+    /*
+    if(msgType != 0 && msgType != ZBHCI_CMD_ACKNOWLEDGE) {
+    	Serial.print(FONT_COLOR_STRONG_MAGENTA);
+  		Serial.printf("MSG TYPE: %#04x\n", msgType);
+  		Serial.print(STYLE_COLOR_RESET);
+    }
+    */
+    
+    if(xQueueReceive(msg_queue, &sHciMsg, portMAX_DELAY)) {
       psPayload = sHciMsg.uPayload.sNetworkStateRspPayloasd;
       setNetworkInfo(&psPayload);
 
-      switch(sHciMsg.u16MsgType)
-      {
+      switch(msgType) {
         case ZBHCI_CMD_ACKNOWLEDGE:
           //Serial.printf(">> ZBHCI_CMD_ACKNOWLEDGE\n");
           //displayAcknowledg(&sHciMsg.uPayload.sAckPayload);
@@ -1199,8 +1308,10 @@ void zbhciTask(void *pvParameters)
           zbhci_ZclSendReportCmd(0x02, sDstAddr, 1, 1, 0, 1, 0x0006, 0x0000, ZCL_DATA_TYPE_BOOLEAN, 1, &ledState);
           */
           break;
+        case ZBHCI_CMD_ZCL_ATTR_READ_RSP:
+          appHandleZCLReadResponse(&sHciMsg.uPayload.sZclAttrReadRspPayload);
         default:
-          Serial.printf("u16MsgType %d\n", sHciMsg.u16MsgType);
+          //Serial.printf("u16MsgType %d\n", msgType);
           break;
       }
     }
@@ -1454,7 +1565,7 @@ void setup()
     xTaskCreatePinnedToCore(getMQ135Uni, "getMQ135Uni", 4096, NULL, 11, NULL, ARDUINO_RUNNING_CORE);
     xTaskCreatePinnedToCore(getHCSR04, "getHCSR04", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
   #endif
-  xTaskCreatePinnedToCore(setBtnTick, "setBtnTick", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
+  //xTaskCreatePinnedToCore(setBtnTick, "setBtnTick", 4096, NULL, 12, NULL, ARDUINO_RUNNING_CORE);
 
   // zbhci_BdbFactoryReset();
   delay(100);
