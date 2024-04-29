@@ -147,21 +147,39 @@ void drawSSD1306()
   sprintf(temp_data_str, "Board #%d", MIKE_BOARD_NUMBER);
   oled.print(temp_data_str);
   */
+
+  oled.update();
   
   #if MIKE_BOARD_NUMBER == 2
-    //-- MQ135 gas sensor
+    //-- HC-SR04 distance sensor
     //-- the first row on yellow
     oled.home();
     //oled.rect(0, 0, 77, 7, OLED_CLEAR);
     oled.setCursorXY(0, 16);
-    sprintf(temp_data_str, "CO2: %d ppm", (int)mq135GasCO2);
+    sprintf(temp_data_str, "Dist: %.2f cm", hcsr04DistanceCm);
     oled.print(temp_data_str);
-  
-    //-- HC-SR04 distance sensor
+    
+    //-- MQ135 gas sensor
     //-- the second row on yellow
     //oled.rect(0, 8, 77, 15, OLED_CLEAR);
     oled.setCursorXY(0, 24);
-    sprintf(temp_data_str, "D: %.2f cm", hcsr04DistanceCm);
+    sprintf(temp_data_str, "CO:%.2f, CO2:%d", mq135GasCO, (int)mq135GasCO2);
+    oled.print(temp_data_str);
+
+    oled.setCursorXY(0, 32);
+    sprintf(temp_data_str, "Alcohol: %.2f", mq135GasAlcohol);
+    oled.print(temp_data_str);
+  	
+    oled.setCursorXY(0, 40);
+    sprintf(temp_data_str, "Toluen: %.2f", mq135GasToluen);
+    oled.print(temp_data_str);
+  	
+    oled.setCursorXY(0, 48);
+    sprintf(temp_data_str, "NH4: %.2f", mq135GasNH4);
+    oled.print(temp_data_str);
+
+    oled.setCursorXY(0, 56);
+    sprintf(temp_data_str, "Aceton: %.2f", mq135GasAceton);
     oled.print(temp_data_str);
   #endif
 
@@ -1067,6 +1085,27 @@ void updateAttributes(int flag)
        //-- MQ135 Gas Sensor
       int16_t tmpPPM = (int)mq135GasCO2;
       zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpPPM);
+
+    	//-- MQ135: CO
+    	int16_t tmpGasCO = mq135GasCO * 100;
+    	zb_sendReport(3, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasCO, ZCL_PRESENT_VALUE_ATTR_ID);
+    
+    	//-- MQ135: Alcohol
+    	int16_t tmpGasAlcohol = mq135GasAlcohol * 100;
+    	zb_sendReport(4, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAlcohol, ZCL_PRESENT_VALUE_ATTR_ID);
+    
+    	//-- MQ135: Toluen
+    	int16_t tmpGasToluen = mq135GasToluen * 100;
+    	zb_sendReport(5, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasToluen, ZCL_PRESENT_VALUE_ATTR_ID);
+
+    	
+    	//-- MQ135: NH4
+    	int16_t tmpGasNH4 = mq135GasNH4 * 100;
+    	zb_sendReport(6, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasNH4, ZCL_PRESENT_VALUE_ATTR_ID);
+    
+    	//-- MQ135: Aceton
+    	int16_t tmpGasAceton = mq135GasAceton * 100;
+    	zb_sendReport(7, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAceton, ZCL_PRESENT_VALUE_ATTR_ID);
     }
   #endif
 
