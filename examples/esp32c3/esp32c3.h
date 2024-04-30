@@ -18,8 +18,13 @@
 
 //-- list of zigbee endpoints
 #define ZIGBEE_ENDPOINT_01             1
+#define ZIGBEE_ENDPOINT_02             2
+#define ZIGBEE_ENDPOINT_03             3
 #define ZIGBEE_ENDPOINT_04             4
 #define ZIGBEE_ENDPOINT_05             5
+#define ZIGBEE_ENDPOINT_06             6
+#define ZIGBEE_ENDPOINT_07             7
+#define ZIGBEE_ENDPOINT_08             8
 
 //-- I2C: SDA/SCL pins & clock speed
 #define ESP32_SDA_PIN                  ESP32C3_GPIO_08
@@ -61,13 +66,9 @@
 #define ZCL_CMD_DISABLE_DEFAULT_RSP    0
 //-- Data length
 #define ZCL_CMD_DATA_LENGTH            2
-//-- Endpoint for BME280/BH1750 sensors
-#define BME280_BH1750_EP               ZIGBEE_ENDPOINT_04
 
 //- PIN for output PIR sensor
 #define PIR_SENSOR_GPIO                ESP32C3_GPIO_06
-//- Endpoints for PIR sensors
-#define PIR_EP                         ZIGBEE_ENDPOINT_01
 //- PIN for LED indicator of PIR sensor
 #define PIR_SENSOR_LED_GPIO            ESP32C3_GPIO_05
 //-- task running delay in seconds
@@ -95,7 +96,6 @@
 //-- define sound speed in cm/uS
 #define HCSR04_SOUND_SPEED             0.034
 #define HCSR04_CM_TO_INCH              0.393701
-#define HCSR04_EP                      ZIGBEE_ENDPOINT_05
 
 
 #define BME680_SEA_LEVEL_PRESSURE      (1013.25)

@@ -84,7 +84,7 @@ float
   mq135GasAlcohol,
   mq135GasCO2,
   mq135GasToluen,
-  mq135GasNH4,
+  mq135GasAmmonium, //-- NH4
   mq135GasAceton;
 
 float
@@ -175,7 +175,7 @@ void drawSSD1306()
     oled.print(temp_data_str);
   	
     oled.setCursorXY(0, 48);
-    sprintf(temp_data_str, "NH4: %.2f", mq135GasNH4);
+    sprintf(temp_data_str, "Ammonium: %.2f", mq135GasAmmonium);
     oled.print(temp_data_str);
 
     oled.setCursorXY(0, 56);
@@ -292,17 +292,17 @@ void drawSSD1306_02()
     
     X = 0; Y = 24;
     oled.setCursorXY(X, Y);
-    sprintf(temp_data_str, "BME280:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME280_BH1750_EP);
+    sprintf(temp_data_str, "BME280:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, ZIGBEE_ENDPOINT_04);
     oled.print(temp_data_str);
     
     X = 0; Y = 32;
     oled.setCursorXY(X, Y);
-    sprintf(temp_data_str, "BH1750:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME280_BH1750_EP);
+    sprintf(temp_data_str, "BH1750:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, ZIGBEE_ENDPOINT_04);
     oled.print(temp_data_str);
     
     X = 0; Y = 40;
     oled.setCursorXY(X, Y);
-    sprintf(temp_data_str, "BME680:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, BME680_EP);
+    sprintf(temp_data_str, "BME680:sda%d,scl%d,ep%d", ESP32_SDA_PIN, ESP32_SCL_PIN, ZIGBEE_ENDPOINT_05);
     oled.print(temp_data_str);
 
     X = 0; Y = 48;
@@ -822,7 +822,7 @@ void printSensorsInfo()
     Serial.print(STYLE_COLOR_RESET);
     Serial.printf(" hPa in Endpoint #");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", BME280_BH1750_EP);
+    Serial.printf("%d\n", ZIGBEE_ENDPOINT_04);
     Serial.print(STYLE_COLOR_RESET);
     
     
@@ -859,7 +859,7 @@ void printSensorsInfo()
     Serial.print(STYLE_COLOR_RESET);
     Serial.printf(" m in Endpoint #");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", BME680_EP);
+    Serial.printf("%d\n", ZIGBEE_ENDPOINT_05);
     Serial.print(STYLE_COLOR_RESET);
     
     
@@ -880,7 +880,7 @@ void printSensorsInfo()
     Serial.print(STYLE_COLOR_RESET);
     Serial.printf(" lux in Endpoint #");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", BME280_BH1750_EP);
+    Serial.printf("%d\n", ZIGBEE_ENDPOINT_04);
     Serial.print(STYLE_COLOR_RESET);
   #endif
 
@@ -914,7 +914,7 @@ void printSensorsInfo()
   Serial.print(STYLE_COLOR_RESET);
   Serial.printf(" in Endpoint #");
   Serial.print(FONT_COLOR_STRONG_YELLOW);
-  Serial.printf("%d\n", PIR_EP);
+  Serial.printf("%d\n", ZIGBEE_ENDPOINT_01);
   Serial.print(STYLE_COLOR_RESET);
   
   #if MIKE_BOARD_NUMBER == 2
@@ -961,13 +961,13 @@ void printSensorsInfo()
     }
     Serial.printf("%.2f", mq135GasToluen);
     Serial.print(STYLE_COLOR_RESET);
-    Serial.printf(", NH4 = ");
+    Serial.printf(", Ammonium = ");
     if(mq135CO2Exceeded1000) {
       Serial.print(FONT_COLOR_STRONG_RED);
     } else {
       Serial.print(FONT_COLOR_STRONG_YELLOW);
     }
-    Serial.printf("%.2f", mq135GasNH4);
+    Serial.printf("%.2f", mq135GasAmmonium);
     Serial.print(STYLE_COLOR_RESET);
     Serial.printf(", Aceton = ");
     if(mq135CO2Exceeded1000) {
@@ -996,7 +996,7 @@ void printSensorsInfo()
     Serial.print(STYLE_COLOR_RESET);
     Serial.printf(" in Endpoint #");
     Serial.print(FONT_COLOR_STRONG_YELLOW);
-    Serial.printf("%d\n", HCSR04_EP);
+    Serial.printf("%d\n", ZIGBEE_ENDPOINT_05);
     Serial.print(STYLE_COLOR_RESET);
   #endif
   //-- empty row between blocks
@@ -1037,75 +1037,74 @@ void updateAttributes(int flag)
     
     //-- BME280 Temperature Sensor
     int16_t tmpTemp = bme280Temp * 100;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
+    zb_sendReport(ZIGBEE_ENDPOINT_04, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp);
     
     //-- BME280 Humidity Sensor
     int16_t tmpHumid = bme280Humid * 100;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
+    zb_sendReport(ZIGBEE_ENDPOINT_04, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid);
     
     //-- BME280 Pressure Sensor
     int16_t tmpPres = bme280Pres * 1;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
+    zb_sendReport(ZIGBEE_ENDPOINT_04, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres);
     
     
     //-- BME680 Temperature Sensor
     int16_t tmpTemp2 = bme680Temp * 100;
-    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp2);
+    zb_sendReport(ZIGBEE_ENDPOINT_05, ZCL_CLUSTER_MS_TEMPERATURE_MEASUREMENT, (uint8_t *)&tmpTemp2);
     
     //-- BME680 Humidity Sensor
     int16_t tmpHumid2 = bme680Humid * 100;
-    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid2);
+    zb_sendReport(ZIGBEE_ENDPOINT_05, ZCL_CLUSTER_MS_RELATIVE_HUMIDITY, (uint8_t *)&tmpHumid2);
     
     //-- BME680 Pressure Sensor
     int16_t tmpPres2 = bme680Pres * 1;
-    zb_sendReport(BME680_EP, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres2);
+    zb_sendReport(ZIGBEE_ENDPOINT_05, ZCL_CLUSTER_MS_PRESSURE_MEASUREMENT, (uint8_t *)&tmpPres2);
  
     //-- BME680 Gas Resistance Sensor
     int16_t tmpGas2 = bme680Gas * 100;
-    zb_sendReport(1, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGas2, ZCL_PRESENT_VALUE_ATTR_ID);
+    zb_sendReport(ZIGBEE_ENDPOINT_01, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGas2, ZCL_PRESENT_VALUE_ATTR_ID);
  
     //-- BME680 Altitude Sensor
     int16_t tmpAlt2 = bme680Alt * 100;
-    zb_sendReport(2, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpAlt2, ZCL_PRESENT_VALUE_ATTR_ID);
+    zb_sendReport(ZIGBEE_ENDPOINT_02, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpAlt2, ZCL_PRESENT_VALUE_ATTR_ID);
  
     //-- BH1750 Illuminance Sensor
     //-- the real "lux" value is multiplied by 100 for correct conversion in the external Zigbee2MQTT converter
     //-- loot at MIKE.ESP32-C3.js: MIKE => just fixed output format: "XXX" => "(XXX / 100).toFixed(2)"
     int16_t tmpIllum = bh1750Illum * 100;
-    zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
+    zb_sendReport(ZIGBEE_ENDPOINT_04, ZCL_CLUSTER_MS_ILLUMINANCE_MEASUREMENT, (uint8_t *)&tmpIllum);
   #endif
 
   //-- PIR Occupancy Sensor
   pirDeviceMotionState = getPIRState_asLib();
   int16_t tmpOccup = pirDeviceMotionState * 1;
-  zb_sendReport(PIR_EP, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup);
+  zb_sendReport(ZIGBEE_ENDPOINT_01, ZCL_CLUSTER_MS_OCCUPANCY_SENSING, (uint8_t *)&tmpOccup);
 
   #if MIKE_BOARD_NUMBER == 2
     if(mq135Inited) {
-       //-- MQ135 Gas Sensor
-      int16_t tmpPPM = (int)mq135GasCO2;
-      zb_sendReport(BME280_BH1750_EP, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpPPM);
+       //-- MQ135: CO2
+      int16_t tmpGasCO2 = (int)mq135GasCO2;
+      zb_sendReport(ZIGBEE_ENDPOINT_01, ZCL_CLUSTER_MS_CO2, (uint8_t *)&tmpGasCO2);
 
     	//-- MQ135: CO
-    	int16_t tmpGasCO = mq135GasCO * 100;
-    	zb_sendReport(3, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasCO, ZCL_PRESENT_VALUE_ATTR_ID);
+    	int16_t tmpGasCO = mq135GasCO * 1000;
+    	zb_sendReport(ZIGBEE_ENDPOINT_02, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasCO, ZCL_PRESENT_VALUE_ATTR_ID);
     
     	//-- MQ135: Alcohol
-    	int16_t tmpGasAlcohol = mq135GasAlcohol * 100;
-    	zb_sendReport(4, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAlcohol, ZCL_PRESENT_VALUE_ATTR_ID);
+    	int16_t tmpGasAlcohol = mq135GasAlcohol * 1000;
+    	zb_sendReport(ZIGBEE_ENDPOINT_03, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAlcohol, ZCL_PRESENT_VALUE_ATTR_ID);
     
     	//-- MQ135: Toluen
-    	int16_t tmpGasToluen = mq135GasToluen * 100;
-    	zb_sendReport(5, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasToluen, ZCL_PRESENT_VALUE_ATTR_ID);
-
+    	int16_t tmpGasToluen = mq135GasToluen * 1000;
+    	zb_sendReport(ZIGBEE_ENDPOINT_04, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasToluen, ZCL_PRESENT_VALUE_ATTR_ID);
     	
-    	//-- MQ135: NH4
-    	int16_t tmpGasNH4 = mq135GasNH4 * 100;
-    	zb_sendReport(6, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasNH4, ZCL_PRESENT_VALUE_ATTR_ID);
+    	//-- MQ135: Ammonium
+    	int16_t tmpGasAmmonium = mq135GasAmmonium * 1000;
+    	zb_sendReport(ZIGBEE_ENDPOINT_05, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAmmonium, ZCL_PRESENT_VALUE_ATTR_ID);
     
     	//-- MQ135: Aceton
-    	int16_t tmpGasAceton = mq135GasAceton * 100;
-    	zb_sendReport(7, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAceton, ZCL_PRESENT_VALUE_ATTR_ID);
+    	int16_t tmpGasAceton = mq135GasAceton * 1000;
+    	zb_sendReport(ZIGBEE_ENDPOINT_06, ZCL_CLUSTER_ID_ANALOG_INPUT, (uint8_t *)&tmpGasAceton, ZCL_PRESENT_VALUE_ATTR_ID);
     }
   #endif
 
@@ -1522,10 +1521,10 @@ void getMQ135Uni(void *pvParameters)
     }
     
     if(mq135CO2Exceeded1000) {
-      mq135GasNH4 = checkPPM(102.2, -2.473) * MQ135_ESP32_ADC;
+      mq135GasAmmonium = checkPPM(102.2, -2.473) * MQ135_ESP32_ADC;
     } else {
       MQ135.setA(102.2); MQ135.setB(-2.473); // Configure the equation to calculate NH4 concentration value
-      mq135GasNH4 = MQ135.readSensor() * MQ135_ESP32_ADC; // Sensor will read PPM concentration using the model, a and b values set previously or from the setup
+      mq135GasAmmonium = MQ135.readSensor() * MQ135_ESP32_ADC; // Sensor will read PPM concentration using the model, a and b values set previously or from the setup
     }
     
     if(mq135CO2Exceeded1000) {
@@ -1545,13 +1544,14 @@ void getMQ135Uni(void *pvParameters)
     
     
     /*
-      Exponential regression:
+    Exponential regression:
+    ~~~~~~~~~~~~~~~~~~~~~~~
     GAS      | a      | b
     CO       | 605.18 | -3.937  
     Alcohol  | 77.255 | -3.18 
     CO2      | 110.47 | -2.862
     Toluen   | 44.947 | -3.445
-    NH4      | 102.2  | -2.473
+    Ammonium | 102.2  | -2.473
     Aceton   | 34.668 | -3.369
     */
     
