@@ -3,7 +3,7 @@
 #include "zb_clusters.h"
 
 
-#define MIKE_BOARD_NUMBER              2
+#define MIKE_BOARD_NUMBER              1
 
 //— list of pins available on the ESP32-C3 + TLSR8258 board (aka LILYGO® T-Zigbee)
 #define ESP32C3_GPIO_01                1 //-> MQ135_SENSOR_GPIO
